@@ -327,10 +327,10 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
 <!-- ══ TAB BAR ══ -->
 <div class="tabs">
   <button class="tab active" onclick="sw(0,this)"><span class="ti">📋</span>Raport</button>
-  <button class="tab" onclick="sw(1,this)"><span class="ti">✉️</span>Solicitări</button>
-  <button class="tab" onclick="sw(2,this)"><span class="ti">📅</span>Plan</button>
-  <button class="tab" onclick="sw(3,this)"><span class="ti">🕐</span>Pontaj</button>
-  <button class="tab" onclick="sw(4,this)"><span class="ti">🏅</span>Certificări</button>
+  <button class="tab" onclick="sw(1,this)"><span class="ti">📅</span>Plan</button>
+  <button class="tab" onclick="sw(2,this)"><span class="ti">✉️</span>Solicitări</button>
+  <button class="tab" onclick="sw(3,this)"><span class="ti">🏅</span>Certificări</button>
+  <button class="tab" onclick="sw(4,this)"><span class="ti">🕐</span>Pontaj</button>
 </div>
 
 <!-- ══ PAGES ══ -->
@@ -410,14 +410,12 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
             <option>Alexandru Lungu</option><option>Adrian Talas</option>
             <option>Ramon Stefana</option><option>Cosmin Bizineche</option>
             <option>Liviu Chelciov</option><option>Nicolas Blaga</option>
-            <option>Liviu Gaitan</option><option>Sergiu Bîlcu</option>
+            <option>Silviu Gaitan</option><option>Sergiu Bîlcu</option>
           </select>
         </div>
         <div class="full">
           <label>Data solicitării</label>
-          <input type="text" id="rqDate" readonly style="
-            background:rgba(0,170,255,.06);border-color:rgba(0,170,255,.25);
-            color:var(--accent);font-weight:600;letter-spacing:.04em;cursor:default;">
+          <input type="date" id="rqDate" readonly style="background:rgba(0,170,255,.06);border-color:rgba(0,170,255,.25);color:var(--accent);font-weight:600;letter-spacing:.04em;cursor:default;">
         </div>
         <div class="full">
           <label>Subiect / Tipul solicitării</label>
@@ -456,7 +454,7 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
       </div>
       <div style="margin-top:12px;padding:9px 11px;background:rgba(0,170,255,.05);border:1px solid rgba(0,170,255,.12);border-radius:7px;">
         <div style="font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:3px;">Destinatar</div>
-        <div style="font-size:.82rem;color:var(--accent);">📧 contabilitate@networkticketsolution.com</div>
+        <div style="font-size:.82rem;color:var(--accent);">📧 networkticketsolution@gmail.com</div>
       </div>
     </div>
   </div>
@@ -541,7 +539,7 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
             <option value="Cosmin Bizineche" data-team="Echipa 2">Cosmin Bizineche</option>
             <option value="Liviu Chelciov"   data-team="Echipa 3">Liviu Chelciov</option>
             <option value="Nicolas Blaga"    data-team="Echipa 3">Nicolas Blaga</option>
-            <option value="Liviu Gaitan"     data-team="Echipa 4">Liviu Gaitan</option>
+            <option value="Silviu Gaitan"    data-team="Echipa 4">Silviu Gaitan</option>
             <option value="Sergiu Bîlcu"     data-team="Echipa 4">Sergiu Bîlcu</option>
           </select>
         </div>
@@ -567,9 +565,6 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
 
   <!-- ── PAGE 4: CERTIFICĂRI ── -->
   <div class="page" id="p4">
-    <div class="info-box">
-      Linkurile certificărilor sunt salvate în <strong>Google Sheets</strong> și sincronizate pentru toată echipa. Apasă ✏️ pentru a adăuga sau actualiza.
-    </div>
     <div class="card">
       <div class="ct">🏅 &nbsp;Certificări Tehnicieni</div>
       <div id="certGrid">
@@ -605,7 +600,7 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
 // ╔══════════════════════════════════════════╗
 // ║  CONFIG                                  ║
 // ╚══════════════════════════════════════════╝
-const EMAIL_TO = 'contabilitate@networkticketsolution.com';
+const EMAIL_TO = 'networkticketsolution@gmail.com';
 const API_URL = 'https://script.google.com/macros/s/AKfycbwDFfFcJuCK5OKAv35tke0U9TQEBkvNF80I7LUMXyjqNZMKrwFZ4xrqMWJCsMZPjxbZ/exec';
 
 const TECHS = [
@@ -615,14 +610,14 @@ const TECHS = [
   {name:'Cosmin Bizineche',ini:'CB', team:'Echipa 2', pri:false},
   {name:'Liviu Chelciov',  ini:'LC', team:'Echipa 3', pri:true},
   {name:'Nicolas Blaga',   ini:'NB', team:'Echipa 3', pri:false},
-  {name:'Liviu Gaitan',    ini:'LG', team:'Echipa 4', pri:true},
+  {name:'Silviu Gaitan',   ini:'SG', team:'Echipa 4', pri:true},
   {name:'Sergiu Bîlcu',    ini:'SB', team:'Echipa 4', pri:false},
 ];
 const WORK_TYPES = ['Swap','Preinstall','Clean-up','Install','Activități Anexe'];
 
 // State
 let selTechs=new Set(), selWork=null, stVal=null, dp=null;
-let gData = { rapoarte:[], plan_url:'https://docs.google.com/spreadsheets/d/e/2PACX-1vRLEHiuD5sC3CtFx_vlHt9Cdg0q-XmmyQekp2-AUoysdUqVSMAFAzf8Xo4k337GYw/pubhtml', pontaj_url:'', certificari:{ AL: { url: 'https://nts2022.ddns.net:5001/d/s/17NR8VINqt8mpG7lwyHuxNjnxYz7UDje/wh4BYed-WEhM-IxZDpFjVmWK82-1uxWl-tb6AlgGgCA0', nota: 'Certificare anuală' } } };
+let gData = { rapoarte:[], plan_url:'https://docs.google.com/spreadsheets/d/e/2PACX-1vRLEHiuD5sC3CtFx_vlHt9Cdg0q-XmmyQekp2-AUoysdUqVSMAFAzf8Xo4k337GYw/pubhtml', pontaj_url:'', certificari:{ SG: { url: 'https://nts2022.ddns.net:5001/d/s/17NR8VINqt8mpG7lwyHuxNjnxYz7UDje/wh4BYed-WEhM-IxZDpFjVmWK82-1uxWl-tb6AlgGgCA0', nota: 'Certificare anuală' } } };
 
 // ╔══════════════════════════════════════════╗
 // ║  SETUP                                   ║
@@ -638,9 +633,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Data auto în formularul de solicitări
   const rqDateEl = document.getElementById('rqDate');
   if (rqDateEl) {
-    rqDateEl.value = now.toLocaleDateString('ro-RO', {
-      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-    });
+    rqDateEl.value = now.toISOString().split('T')[0];
   }
 
   buildTech();
@@ -658,12 +651,15 @@ document.addEventListener('DOMContentLoaded', () => {
 // ╔══════════════════════════════════════════╗
 // ║  TABS                                    ║
 // ╚══════════════════════════════════════════╝
+// TAB_TO_PAGE: tab index → index pagină în DOM
+// Tab0=Raport(p0) Tab1=Plan(p2) Tab2=Solicitări(p1) Tab3=Certificări(p4) Tab4=Pontaj(p3)
+const TAB_TO_PAGE = [0, 2, 1, 4, 3];
 function sw(i, btn) {
-  document.querySelectorAll('.page').forEach((p,j)=>p.classList.toggle('active',j===i));
+  const pi = TAB_TO_PAGE[i];
+  document.querySelectorAll('.page').forEach((p,j)=>p.classList.toggle('active',j===pi));
   document.querySelectorAll('.tab').forEach((b,j)=>b.classList.toggle('active',j===i));
-  // Refresh relevant tab
-  if(i===2) renderPlan();
-  if(i===4) renderCert();
+  if(i===1) renderPlan();
+  if(i===3) renderCert();
 }
 
 // ╔══════════════════════════════════════════╗
@@ -751,7 +747,7 @@ function buildTech() {
   Object.entries(tm).forEach(([tn,ms]) => {
     const pri = ms.find(m=>m.pri);
     const w = document.createElement('div'); w.className='tgrp'; w.dataset.team=tn;
-    w.innerHTML=`<div class="tlabel">${tn}<span>titular: ${pri?.name||''}</span></div>`;
+    w.innerHTML=`<div class="tlabel">${tn}</div>`;
     const r = document.createElement('div'); r.className='tmembers';
     ms.forEach(t => {
       const d = document.createElement('div');
@@ -765,8 +761,7 @@ function buildTech() {
     w.appendChild(r);
     const sn=document.createElement('div');
     sn.className='sn hidden'; sn.id='sn-'+tn.replace(/\s/g,'');
-    sn.innerHTML=`<div class="sn-hdr">⚠ &nbsp;<span><strong>${pri?.name||'Titularul'}</strong> nu este selectat ca titular.</span></div>
-      <label style="margin-bottom:5px;display:block;">Motiv înlocuire</label>
+    sn.innerHTML=`<label style="margin-bottom:5px;display:block;">Motiv înlocuire</label>
       <input type="text" id="sni-${tn.replace(/\s/g,'')}" placeholder="Ex: Concediu, indisponibil, schimb de tură...">`;
     w.appendChild(sn);
     g.appendChild(w);
@@ -965,44 +960,70 @@ function attachSigEvents() {
   c.ontouchstart = start; c.ontouchmove  = move; c.ontouchend  = end;
 }
 
-function confirmSig() {
+async function confirmSig() {
   if(!sigHasMark){ toast('Te rugăm să semnezi înainte de a trimite!',true); return; }
   closeSig();
-  dispatchEmail();
+  await dispatchEmail();
 }
 
-// ── trimitere email cu imagine (dacă există) ──
-function dispatchEmail() {
+// ── trimitere email direct prin Gmail (Google Apps Script) ──
+// Necesită în GAS, în doPost(): case 'sendEmail': GmailApp.sendEmail(data.to, data.subject, data.body, {name:'NTS Portal'}); return ok();
+async function dispatchEmail() {
   const nm = document.getElementById('rqName').value;
   const sb = document.getElementById('rqSubj').value;
   const mg = document.getElementById('rqMsg').value.trim();
-  const imgNote = capturedImgDataUrl ? '\n\n[Imagine atașată — vezi fișierul trimis separat]' : '';
-  const dt = document.getElementById('rqDate')?.value || new Date().toLocaleDateString('ro-RO');
+  const dt = document.getElementById('rqDate')?.value || new Date().toISOString().split('T')[0];
   const sigDataUrl = (sigCanvas && sigHasMark) ? sigCanvas.toDataURL('image/png') : null;
-  const sigNote = sigDataUrl ? '\n\n[✍️ Solicitare semnată digital — semnătura este atașată]' : '';
-  const subL = encodeURIComponent('[NTS Solicitare] ' + sb + ' – ' + nm + ' (' + dt + ')');
-  const bdy  = encodeURIComponent(
+
+  const emailSubject = '[NTS Solicitare] ' + sb + ' – ' + nm + ' (' + dt + ')';
+  const emailBody =
     'Bună ziua,' +
     '\n\nNume: ' + nm +
     '\nData: ' + dt +
     '\nSubiect: ' + sb +
     '\n\n' + mg +
-    imgNote +
-    sigNote +
-    '\n\n---\nSolicitare trimisă din NTS Portal\nNetwork Ticket Solution — contabilitate@networkticketsolution.com'
-  );
-  window.location.href = 'mailto:' + EMAIL_TO + '?subject=' + subL + '&body=' + bdy;
-  toast('✔ Se deschide aplicația de email...');
-  // Reset form
-  setTimeout(() => {
-    document.getElementById('rqName').value='';
-    document.getElementById('rqSubj').value='';
-    document.getElementById('rqMsg').value='';
-    // Re-setează data la zi curentă
-    const rqDE = document.getElementById('rqDate');
-    if (rqDE) rqDE.value = new Date().toLocaleDateString('ro-RO', {weekday:'long',day:'numeric',month:'long',year:'numeric'});
-    removeImg();
-  }, 1000);
+    (capturedImgDataUrl ? '\n\n[Imagine ataşată — transmisă separat]' : '') +
+    (sigDataUrl ? '\n\n[✍️ Solicitare semnată digital]' : '') +
+    '\n\n---\nSolicitare trimisă din NTS Portal\nNetwork Ticket Solution';
+
+  loader(true, 'Se trimite solicitarea prin Gmail...');
+  try {
+    const res = await apiCall('POST', {
+      action:   'sendEmail',
+      to:       EMAIL_TO,
+      subject:  emailSubject,
+      body:     emailBody,
+      nume:     nm,
+      data:     dt,
+      subiect:  sb,
+      mesaj:    mg,
+      semnatura: sigDataUrl || ''
+    });
+    if (res && (res.ok || res.nocors)) {
+      toast('✔ Solicitare trimisă cu succes prin Gmail!');
+      resetReq();
+    } else {
+      throw new Error(res?.error || 'Eroare API');
+    }
+  } catch(e) {
+    toast('⚠ Fallback: se deschide aplicația email...', false, true);
+    const subL = encodeURIComponent(emailSubject);
+    const bdy  = encodeURIComponent(emailBody);
+    setTimeout(() => { window.location.href = 'mailto:' + EMAIL_TO + '?subject=' + subL + '&body=' + bdy; }, 600);
+    resetReq();
+  } finally {
+    loader(false);
+  }
+}
+
+// Reset formular solicitări
+function resetReq() {
+  document.getElementById('rqName').value = '';
+  document.getElementById('rqSubj').value = '';
+  document.getElementById('rqMsg').value  = '';
+  const rqDE = document.getElementById('rqDate');
+  if (rqDE) rqDE.value = new Date().toISOString().split('T')[0];
+  removeImg();
 }
 
 // ╔══════════════════════════════════════════╗
@@ -1118,7 +1139,7 @@ const TEAM_MEMBERS = {
   'Echipa 1': ['Alexandru Lungu','Adrian Talas'],
   'Echipa 2': ['Ramon Stefana','Cosmin Bizineche'],
   'Echipa 3': ['Liviu Chelciov','Nicolas Blaga'],
-  'Echipa 4': ['Liviu Gaitan','Sergiu Bîlcu'],
+  'Echipa 4': ['Silviu Gaitan','Sergiu Bîlcu'],
 };
 
 function syncTeamFilter() {
