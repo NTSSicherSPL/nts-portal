@@ -414,6 +414,12 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
           </select>
         </div>
         <div class="full">
+          <label>Data solicitării</label>
+          <input type="text" id="rqDate" readonly style="
+            background:rgba(0,170,255,.06);border-color:rgba(0,170,255,.25);
+            color:var(--accent);font-weight:600;letter-spacing:.04em;cursor:default;">
+        </div>
+        <div class="full">
           <label>Subiect / Tipul solicitării</label>
           <select id="rqSubj">
             <option value="">— Selectează subiect —</option>
@@ -629,6 +635,13 @@ let gData = { rapoarte:[], plan_url:'https://docs.google.com/spreadsheets/d/e/2P
 document.addEventListener('DOMContentLoaded', () => {
   const now = new Date();
   document.getElementById('reportDate').value = now.toISOString().split('T')[0];
+  // Data auto în formularul de solicitări
+  const rqDateEl = document.getElementById('rqDate');
+  if (rqDateEl) {
+    rqDateEl.value = now.toLocaleDateString('ro-RO', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+    });
+  }
 
   buildTech();
   buildPills();
@@ -964,8 +977,20 @@ function dispatchEmail() {
   const sb = document.getElementById('rqSubj').value;
   const mg = document.getElementById('rqMsg').value.trim();
   const imgNote = capturedImgDataUrl ? '\n\n[Imagine atașată — vezi fișierul trimis separat]' : '';
-  const subL = encodeURIComponent('[NTS Solicitare] ' + sb + ' – ' + nm);
-  const bdy  = encodeURIComponent('Bună ziua,\n\nNume: ' + nm + '\nSubiect: ' + sb + '\n\n' + mg + imgNote + '\n\nSolicitare semnată digital.\nTrimis din NTS Portal');
+  const dt = document.getElementById('rqDate')?.value || new Date().toLocaleDateString('ro-RO');
+  const sigDataUrl = (sigCanvas && sigHasMark) ? sigCanvas.toDataURL('image/png') : null;
+  const sigNote = sigDataUrl ? '\n\n[✍️ Solicitare semnată digital — semnătura este atașată]' : '';
+  const subL = encodeURIComponent('[NTS Solicitare] ' + sb + ' – ' + nm + ' (' + dt + ')');
+  const bdy  = encodeURIComponent(
+    'Bună ziua,' +
+    '\n\nNume: ' + nm +
+    '\nData: ' + dt +
+    '\nSubiect: ' + sb +
+    '\n\n' + mg +
+    imgNote +
+    sigNote +
+    '\n\n---\nSolicitare trimisă din NTS Portal\nNetwork Ticket Solution — contabilitate@networkticketsolution.com'
+  );
   window.location.href = 'mailto:' + EMAIL_TO + '?subject=' + subL + '&body=' + bdy;
   toast('✔ Se deschide aplicația de email...');
   // Reset form
@@ -973,6 +998,9 @@ function dispatchEmail() {
     document.getElementById('rqName').value='';
     document.getElementById('rqSubj').value='';
     document.getElementById('rqMsg').value='';
+    // Re-setează data la zi curentă
+    const rqDE = document.getElementById('rqDate');
+    if (rqDE) rqDE.value = new Date().toLocaleDateString('ro-RO', {weekday:'long',day:'numeric',month:'long',year:'numeric'});
     removeImg();
   }, 1000);
 }
