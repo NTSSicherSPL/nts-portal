@@ -1289,50 +1289,74 @@ function resetReqForm() {
 // ╚══════════════════════════════════════════╝
 const PLAN_URL_DEFAULT = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRLEHiuD5sC3CtFx_vlHt9Cdg0q-XmmyQekp2-AUoysdUqVSMAFAzf8Xo4k337GYw/pubhtml';
 
-// Real GID map extracted directly from the published sheet
+// GID map — se completează automat din fetch la pubhtml
 const PLAN_GID_MAP = {"KW03": "1014315902", "KW04": "1856886874", "KW05": "108324973", "KW06": "763291193", "KW07": "91102157", "KW08": "1688520736", "KW09": "84537899", "KW10": "1302325059", "KW11": "1975033641", "KW12": "1061181002", "KW13": "1331110351", "KW14": "1818135625", "KW15": "939295662", "KW16": "1581976862", "KW17": "1779880058", "KW18": "1194226"};
 const PLAN_SHEET_NAMES = ["KW03", "KW04", "KW05", "KW06", "KW07", "KW08", "KW09", "KW10", "KW11", "KW12", "KW13", "KW14", "KW15", "KW16", "KW17", "KW18"];
 
-let planCurrentIdx = 0; // default KW03
+let planCurrentIdx = 0;
+let planSheetsLoaded = false; // flag — am extras deja GID-urile din pubhtml?
+
+// Extrage toate sheet-urile (nume + gid) din pagina pubhtml Google Sheets
+async function fetchPlanSheets() {
+  try {
+    const resp = await fetch(PLAN_URL_DEFAULT, { cache: 'no-cache' });
+    if (!resp.ok) return;
+    const html = await resp.text();
+    // Google pubhtml contine: <li id="sheet-button-NNN" ...>NUMEFOI</li>
+    // SAU in scriptul JSON: {"name":"KW19","id":NNNN}
+    // Metoda 1: cauta pattern-ul din li#sheet-button
+    const liRe = /id="sheet-button-(\d+)"[^>]*>\s*([^<]+)\s*<\/li>/g;
+    let m;
+    const found = [];
+    while ((m = liRe.exec(html)) !== null) {
+      const gid = m[1];
+      const name = m[2].trim();
+      if (/^KW\d{2}$/i.test(name)) found.push({ name, gid });
+    }
+    if (found.length === 0) {
+      // Metoda 2: cauta in JSON embeded {"name":"KW19","id":NNNN}
+      const jsonRe = /\\"name\\":\\s*\\"(KW\d{2})\\"[^}]*\\"id\\":\\s*(\d+)/gi;
+      while ((m = jsonRe.exec(html)) !== null) {
+        found.push({ name: m[1], gid: m[2] });
+      }
+    }
+    if (found.length > 0) {
+      found.forEach(s => { PLAN_GID_MAP[s.name] = s.gid; });
+      const names = found.map(s => s.name).sort();
+      // Adauga in PLAN_SHEET_NAMES orice KW nou
+      names.forEach(n => { if (!PLAN_SHEET_NAMES.includes(n)) PLAN_SHEET_NAMES.push(n); });
+      PLAN_SHEET_NAMES.sort();
+      planSheetsLoaded = true;
+    }
+  } catch(e) { /* silently fail */ }
+}
 
 function renderPlan() {
-  // Build complete list of KW names up to current week + 2
-  const currentWk = getISOWeek(new Date());
-  const currentKW = 'KW' + String(currentWk).padStart(2,'0');
-  const maxWk = Math.max(currentWk + 2, 18);
-  const allKWNames = [];
-  for (let w = 3; w <= maxWk; w++) {
-    allKWNames.push('KW' + String(w).padStart(2,'0'));
-  }
+  if (!gData.plan_url) gData.plan_url = PLAN_URL_DEFAULT;
 
-  // Use dynamic sheets from GSheets API if available
-  if (gData.planSheets && gData.planSheets.length > 0) {
-    const apiSheets = gData.planSheets.filter(s => /^KW\d{2}$/i.test(s.name));
-    apiSheets.forEach(s => { if (s.gid) PLAN_GID_MAP[s.name] = String(s.gid); });
-    // Add any API sheet names not already in list
-    apiSheets.forEach(s => { if (!allKWNames.includes(s.name)) allKWNames.push(s.name); });
-    allKWNames.sort();
+  // Extrage GID-urile live din pubhtml (o singura data per sesiune)
+  if (!planSheetsLoaded) {
+    fetchPlanSheets().then(() => _renderPlanUI());
+  } else {
+    _renderPlanUI();
   }
+}
 
-  // Rebuild dropdown if changed
-  const sel = document.getElementById('planSelect');
-  if (sel) {
-    const currentNames = [...sel.options].map(o => o.value);
-    if (JSON.stringify(currentNames) !== JSON.stringify(allKWNames)) {
-      sel.innerHTML = allKWNames
-        .map(n => `<option value="${n}">\u{1F4C5}  S\u0103pt\u0103m\u00e2na ${n.replace('KW','')}${PLAN_GID_MAP[n] ? '' : ' \u26a0'}</option>`)
-        .join('');
-    }
-  }
-  PLAN_SHEET_NAMES.length = 0;
-  allKWNames.forEach(n => PLAN_SHEET_NAMES.push(n));
-
+function _renderPlanUI() {
   // Auto-select current ISO week
-  const found = PLAN_SHEET_NAMES.indexOf(currentKW);
+  const wk = getISOWeek(new Date());
+  const kwName = 'KW' + String(wk).padStart(2,'0');
+  const found = PLAN_SHEET_NAMES.indexOf(kwName);
   planCurrentIdx = found >= 0 ? found : PLAN_SHEET_NAMES.length - 1;
 
-  if (sel) sel.value = PLAN_SHEET_NAMES[planCurrentIdx];
-  if (!gData.plan_url) gData.plan_url = PLAN_URL_DEFAULT;
+  // Rebuild dropdown
+  const sel = document.getElementById('planSelect');
+  if (sel) {
+    sel.innerHTML = PLAN_SHEET_NAMES
+      .map(n => `<option value="${n}">📅  Săptămâna ${n.replace('KW','')}</option>`)
+      .join('');
+    sel.value = PLAN_SHEET_NAMES[planCurrentIdx];
+  }
 
   loadPlanSheet(planCurrentIdx);
 }
@@ -1351,13 +1375,29 @@ function loadPlanSheet(idx) {
 
   const wrap = document.getElementById('planWrap');
   if (gid) {
-    // Use #gid= hash — this is how Google pubhtml navigates between sheets
     const url = PLAN_URL_DEFAULT + '#gid=' + gid;
     wrap.innerHTML = '<iframe id="planFrame" src="' + url + '" style="width:100%;height:520px;border:none;display:block;" allowfullscreen></iframe>';
   } else {
-    // GID not yet available for this week — show placeholder
+    // GID necunoscut — incearca sa re-fetch si afiseaza placeholder
     const wkNum = sheetName.replace('KW','');
-    wrap.innerHTML = '<div class="frame-ph"><div class="bi">📅</div><p>Planul pentru <strong>săptămâna ' + wkNum + '</strong> nu a fost adăugat încă în Google Sheets.<br><br>Revino mai târziu sau contactează administratorul.</p></div>';
+    wrap.innerHTML = '<div class="frame-ph"><div class="bi">⏳</div><p>Se cauta planul pentru <strong>săptămâna ' + wkNum + '</strong>…</p></div>';
+    fetchPlanSheets().then(() => {
+      const newGid = PLAN_GID_MAP[sheetName];
+      if (newGid) {
+        const url = PLAN_URL_DEFAULT + '#gid=' + newGid;
+        wrap.innerHTML = '<iframe id="planFrame" src="' + url + '" style="width:100%;height:520px;border:none;display:block;" allowfullscreen></iframe>';
+        // Actualizeaza dropdown
+        const sel = document.getElementById('planSelect');
+        if (sel) {
+          sel.innerHTML = PLAN_SHEET_NAMES
+            .map(n => `<option value="${n}">📅  Săptămâna ${n.replace('KW','')}</option>`)
+            .join('');
+          sel.value = sheetName;
+        }
+      } else {
+        wrap.innerHTML = '<div class="frame-ph"><div class="bi">📅</div><p>Planul pentru <strong>săptămâna ' + wkNum + '</strong> nu a fost adăugat încă în Google Sheets.</p></div>';
+      }
+    });
   }
 
   // Sync dropdown
