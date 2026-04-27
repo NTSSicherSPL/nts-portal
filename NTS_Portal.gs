@@ -393,22 +393,64 @@ function addAccessRequest(emailLow, name) {
 
 function notifyAdmin(email, name) {
   try {
+    var approveUrl = 'https://script.google.com/macros/s/AKfycbxAjOgmiqOrj-DdgYfL57cToAuMfIi4pErEyw0kNcXNif4-K_PNhp30Sxp2NgLk0R4v/exec?action=approveUser&adminEmail=' +
+      encodeURIComponent(CFG.adminEmail) + '&targetEmail=' + encodeURIComponent(email);
+    var denyUrl = 'https://script.google.com/macros/s/AKfycbxAjOgmiqOrj-DdgYfL57cToAuMfIi4pErEyw0kNcXNif4-K_PNhp30Sxp2NgLk0R4v/exec?action=denyUser&adminEmail=' +
+      encodeURIComponent(CFG.adminEmail) + '&targetEmail=' + encodeURIComponent(email);
+
     GmailApp.sendEmail(CFG.adminEmail, '🔐 Cerere acces NTS Portal — ' + name, '', {
       htmlBody:
-        '<div style="font-family:Arial,sans-serif;max-width:480px;">' +
-        '<div style="background:#0a1628;padding:14px 18px;border-radius:8px 8px 0 0;">' +
-        '<h2 style="color:#f0a500;margin:0;font-size:16px;">👑 Cerere acces nou — NTS Portal</h2></div>' +
-        '<div style="background:#f5f5f5;border:1px solid #ddd;border-top:none;' +
-        'padding:18px 20px;border-radius:0 0 8px 8px;">' +
-        '<p style="font-size:13px;"><b>Nume:</b> ' + name + '</p>' +
-        '<p style="font-size:13px;"><b>Email:</b> ' + email + '</p>' +
-        '<p style="font-size:13px;"><b>Data:</b> ' + new Date().toLocaleString('ro-RO') + '</p>' +
-        '<hr style="margin:14px 0;border-color:#ddd;">' +
-        '<p style="font-size:13px;">Deschide <b>NTS Group Portal</b> cu contul tău de admin' +
-        ' și apasă <b>👑 Admin</b> pentru a aproba sau refuza.<br><br>' +
-        'Sau schimbă direct în sheet-ul <b>AccessControl</b> coloana <b>Status</b>' +
-        ' din <code>pending</code> în <code>approved</code>.</p>' +
-        '<p style="font-size:10px;color:#aaa;margin-top:14px;">— NTS Group Portal</p>' +
+        '<div style="font-family:Arial,sans-serif;max-width:500px;">' +
+
+        '<div style="background:#0a1628;padding:16px 20px;border-radius:8px 8px 0 0;">' +
+        '<h2 style="color:#f0a500;margin:0;font-size:17px;">👑 Cerere acces nou — NTS Portal</h2>' +
+        '</div>' +
+
+        '<div style="background:#f9f9f9;border:1px solid #ddd;border-top:none;' +
+        'padding:20px 22px;border-radius:0 0 8px 8px;">' +
+
+        '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px;">' +
+        '<tr><td style="padding:4px 0;color:#666;width:80px"><b>Nume:</b></td>' +
+        '<td style="padding:4px 0;">' + name + '</td></tr>' +
+        '<tr><td style="padding:4px 0;color:#666;"><b>Email:</b></td>' +
+        '<td style="padding:4px 0;">' + email + '</td></tr>' +
+        '<tr><td style="padding:4px 0;color:#666;"><b>Data:</b></td>' +
+        '<td style="padding:4px 0;">' + new Date().toLocaleString('ro-RO') + '</td></tr>' +
+        '</table>' +
+
+        '<p style="font-size:13px;color:#333;margin-bottom:16px;">' +
+        'Apasă unul din butoanele de mai jos pentru a decide accesul:</p>' +
+
+        '<table style="width:100%;border-collapse:collapse;">' +
+        '<tr>' +
+        '<td style="padding-right:8px;">' +
+        '<a href="' + approveUrl + '" ' +
+        'style="display:block;text-align:center;padding:13px 0;' +
+        'background:linear-gradient(135deg,#005533,#00cc77);' +
+        'color:#fff;text-decoration:none;border-radius:8px;' +
+        'font-family:Arial,sans-serif;font-size:15px;font-weight:700;' +
+        'letter-spacing:1px;">✔ APROBĂ ACCESUL</a>' +
+        '</td>' +
+        '<td style="padding-left:8px;">' +
+        '<a href="' + denyUrl + '" ' +
+        'style="display:block;text-align:center;padding:13px 0;' +
+        'background:#fff;color:#cc2200;text-decoration:none;' +
+        'border:2px solid #cc2200;border-radius:8px;' +
+        'font-family:Arial,sans-serif;font-size:15px;font-weight:700;' +
+        'letter-spacing:1px;">✕ REFUZĂ</a>' +
+        '</td>' +
+        '</tr>' +
+        '</table>' +
+
+        '<div style="margin-top:18px;padding:11px 14px;' +
+        'background:#fff3cd;border:1px solid #ffc107;border-radius:6px;' +
+        'font-size:12px;color:#856404;">' +
+        '⚠ Aceste linkuri funcționează doar dacă ești autentificat cu contul ' +
+        '<b>' + CFG.adminEmail + '</b> în browser.' +
+        '</div>' +
+
+        '<p style="font-size:10px;color:#bbb;margin-top:14px;text-align:right;">' +
+        '— NTS Group Portal</p>' +
         '</div></div>',
       name: 'NTS Group Portal'
     });
