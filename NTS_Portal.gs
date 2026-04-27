@@ -198,7 +198,7 @@ function sendEmailFn(p) {
     'border-radius:6px;font-size:13px;line-height:1.6">' + mesaj.replace(/\n/g,'<br>') + '</div>' +
     sigSection +
     '<p style="font-size:10px;color:#bbb;margin-top:18px;text-align:right">Trimis din NTS Group Portal · ' +
-    new Date().toLocaleString('ro-RO') + '</p></div></div>';
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd.MM.yyyy HH:mm') + '</p></div></div>';
 
   var opts = { htmlBody:html, name:'NTS Group Portal' };
 
@@ -393,73 +393,82 @@ function addAccessRequest(emailLow, name) {
 
 function notifyAdmin(email, name) {
   try {
-    var approveUrl = 'https://script.google.com/macros/s/AKfycbxAjOgmiqOrj-DdgYfL57cToAuMfIi4pErEyw0kNcXNif4-K_PNhp30Sxp2NgLk0R4v/exec?action=approveUser&adminEmail=' +
-      encodeURIComponent(CFG.adminEmail) + '&targetEmail=' + encodeURIComponent(email);
-    var denyUrl = 'https://script.google.com/macros/s/AKfycbxAjOgmiqOrj-DdgYfL57cToAuMfIi4pErEyw0kNcXNif4-K_PNhp30Sxp2NgLk0R4v/exec?action=denyUser&adminEmail=' +
-      encodeURIComponent(CFG.adminEmail) + '&targetEmail=' + encodeURIComponent(email);
+    // Utilities.formatDate este metoda corecta in GAS (nu toLocaleString)
+    var dateStr = Utilities.formatDate(
+      new Date(),
+      Session.getScriptTimeZone(),
+      'dd.MM.yyyy HH:mm'
+    );
 
-    GmailApp.sendEmail(CFG.adminEmail, '🔐 Cerere acces NTS Portal — ' + name, '', {
-      htmlBody:
-        '<div style="font-family:Arial,sans-serif;max-width:500px;">' +
+    var approveUrl =  + URL + 
+      + '?action=approveUser'
+      + '&adminEmail=' + CFG.adminEmail
+      + '&targetEmail=' + email;
 
-        '<div style="background:#0a1628;padding:16px 20px;border-radius:8px 8px 0 0;">' +
-        '<h2 style="color:#f0a500;margin:0;font-size:17px;">👑 Cerere acces nou — NTS Portal</h2>' +
-        '</div>' +
+    var denyUrl =  + URL + 
+      + '?action=denyUser'
+      + '&adminEmail=' + CFG.adminEmail
+      + '&targetEmail=' + email;
 
-        '<div style="background:#f9f9f9;border:1px solid #ddd;border-top:none;' +
-        'padding:20px 22px;border-radius:0 0 8px 8px;">' +
+    var html = '<div style="font-family:Arial,sans-serif;max-width:500px;">'
 
-        '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px;">' +
-        '<tr><td style="padding:4px 0;color:#666;width:80px"><b>Nume:</b></td>' +
-        '<td style="padding:4px 0;">' + name + '</td></tr>' +
-        '<tr><td style="padding:4px 0;color:#666;"><b>Email:</b></td>' +
-        '<td style="padding:4px 0;">' + email + '</td></tr>' +
-        '<tr><td style="padding:4px 0;color:#666;"><b>Data:</b></td>' +
-        '<td style="padding:4px 0;">' + new Date().toLocaleString('ro-RO') + '</td></tr>' +
-        '</table>' +
+      + '<div style="background:#0a1628;padding:16px 20px;border-radius:8px 8px 0 0;">'
+      + '<h2 style="color:#f0a500;margin:0;font-size:17px;">NTS Group Portal — Cerere acces nou</h2>'
+      + '</div>'
 
-        '<p style="font-size:13px;color:#333;margin-bottom:16px;">' +
-        'Apasă unul din butoanele de mai jos pentru a decide accesul:</p>' +
+      + '<div style="background:#f9f9f9;border:1px solid #ddd;border-top:none;'
+      + 'padding:20px 22px;border-radius:0 0 8px 8px;">'
 
-        '<table style="width:100%;border-collapse:collapse;">' +
-        '<tr>' +
-        '<td style="padding-right:8px;">' +
-        '<a href="' + approveUrl + '" ' +
-        'style="display:block;text-align:center;padding:13px 0;' +
-        'background:linear-gradient(135deg,#005533,#00cc77);' +
-        'color:#fff;text-decoration:none;border-radius:8px;' +
-        'font-family:Arial,sans-serif;font-size:15px;font-weight:700;' +
-        'letter-spacing:1px;">✔ APROBĂ ACCESUL</a>' +
-        '</td>' +
-        '<td style="padding-left:8px;">' +
-        '<a href="' + denyUrl + '" ' +
-        'style="display:block;text-align:center;padding:13px 0;' +
-        'background:#fff;color:#cc2200;text-decoration:none;' +
-        'border:2px solid #cc2200;border-radius:8px;' +
-        'font-family:Arial,sans-serif;font-size:15px;font-weight:700;' +
-        'letter-spacing:1px;">✕ REFUZĂ</a>' +
-        '</td>' +
-        '</tr>' +
-        '</table>' +
+      + '<table style="font-size:13px;border-collapse:collapse;margin-bottom:18px;">'
+      + '<tr><td style="padding:4px 8px 4px 0;color:#666;"><b>Nume:</b></td>'
+      + '    <td style="padding:4px 0;">' + name + '</td></tr>'
+      + '<tr><td style="padding:4px 8px 4px 0;color:#666;"><b>Email:</b></td>'
+      + '    <td style="padding:4px 0;">' + email + '</td></tr>'
+      + '<tr><td style="padding:4px 8px 4px 0;color:#666;"><b>Data:</b></td>'
+      + '    <td style="padding:4px 0;">' + dateStr + '</td></tr>'
+      + '</table>'
 
-        '<div style="margin-top:18px;padding:11px 14px;' +
-        'background:#fff3cd;border:1px solid #ffc107;border-radius:6px;' +
-        'font-size:12px;color:#856404;">' +
-        '⚠ Aceste linkuri funcționează doar dacă ești autentificat cu contul ' +
-        '<b>' + CFG.adminEmail + '</b> în browser.' +
-        '</div>' +
+      + '<p style="font-size:13px;color:#333;margin-bottom:16px;">'
+      + 'Apasa unul din butoanele de mai jos:</p>'
 
-        '<p style="font-size:10px;color:#bbb;margin-top:14px;text-align:right;">' +
-        '— NTS Group Portal</p>' +
-        '</div></div>',
-      name: 'NTS Group Portal'
-    });
-  } catch(e) { Logger.log('Notificare admin esuata: ' + e.message); }
+      + '<table style="width:100%;border-collapse:collapse;">'
+      + '<tr>'
+      + '<td style="padding-right:6px;">'
+      + '<a href="' + approveUrl + '" style="display:block;text-align:center;'
+      + 'padding:14px 0;background:#00aa55;color:#fff;text-decoration:none;'
+      + 'border-radius:8px;font-size:15px;font-weight:bold;">'
+      + 'APROBA ACCESUL</a>'
+      + '</td>'
+      + '<td style="padding-left:6px;">'
+      + '<a href="' + denyUrl + '" style="display:block;text-align:center;'
+      + 'padding:14px 0;background:#fff;color:#cc2200;text-decoration:none;'
+      + 'border:2px solid #cc2200;border-radius:8px;font-size:15px;font-weight:bold;">'
+      + 'REFUZA</a>'
+      + '</td>'
+      + '</tr>'
+      + '</table>'
+
+      + '<p style="font-size:11px;color:#999;margin-top:16px;">'
+      + 'NTS Group Portal — ' + dateStr
+      + '</p>'
+      + '</div></div>';
+
+    GmailApp.sendEmail(
+      CFG.adminEmail,
+      'Cerere acces NTS Portal: ' + name + ' (' + email + ')',
+      'Cerere noua de acces: ' + name + ' - ' + email,
+      { htmlBody: html, name: 'NTS Group Portal' }
+    );
+
+    Logger.log('Email notificare admin trimis pentru: ' + email);
+
+  } catch(e) {
+    // Logheaza eroarea dar nu o ascunde
+    Logger.log('EROARE notifyAdmin: ' + e.message + ' | stack: ' + e.stack);
+    throw new Error('Nu s-a putut trimite emailul de notificare: ' + e.message);
+  }
 }
 
-// ══════════════════════════════════════════════════════════════════
-//  👑  ADMIN — Gestionare acces
-// ══════════════════════════════════════════════════════════════════
 function getPending(adminEmail) {
   if ((adminEmail||'').toLowerCase() !== CFG.adminEmail.toLowerCase())
     return { ok:false, error:'Acces nepermis' };
