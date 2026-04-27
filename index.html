@@ -946,9 +946,16 @@ async function apiCall(method, params) {
   if (method === 'GET') {
     const qs = new URLSearchParams(params).toString();
     const r = await fetch(API_URL + '?' + qs, { method:'GET', redirect:'follow' });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+    if (!r.ok) throw new Error('Server HTTP ' + r.status);
     const txt = await r.text();
-    return JSON.parse(txt);
+    if (!txt || !txt.trim()) throw new Error('Răspuns gol de la server');
+    try {
+      return JSON.parse(txt);
+    } catch(e) {
+      // GAS a returnat HTML in loc de JSON (eroare de script)
+      console.error('GAS raspuns non-JSON:', txt.slice(0,200));
+      throw new Error('GAS Script Error — verifica deployment-ul');
+    }
   } else {
     // Trimite payload ca param GET pentru a evita preflight CORS
     const payload = encodeURIComponent(JSON.stringify(params));
@@ -1633,20 +1640,39 @@ async function stepSendCode() {
 
   try {
     const res = await apiCall('GET', { action:'requestOtp', email, name });
+
+    // Diagnosticare completa raspuns
+    console.log('requestOtp raspuns:', JSON.stringify(res));
+
     if (!res) throw new Error('Fără răspuns de la server');
 
-    if (res.status === 'approved' && res.otpSent) {
+    // GAS vechi — nu cunoaste actiunea requestOtp
+    if (res.ok === false && res.error) throw new Error('GAS: ' + res.error);
+
+    // Fallback no-cors — nu putem citi raspunsul
+    if (res.nocors) throw new Error('Raspunsul GAS nu poate fi citit (CORS). Verifica deployment-ul.');
+
+    const status = res.status || res.accessStatus || null;
+
+    if (!status) {
+      throw new Error('GAS-ul nu a returnat un status. Asigura-te ca scriptul NTS_Portal.gs a fost uploadat si redeploy-uit.');
+    }
+
+    if (status === 'approved' && res.otpSent) {
       // Cont aprobat → afisam ecranul OTP
       document.getElementById('otpEmail').textContent = email;
       document.getElementById('inpOtp').value = '';
       showView('vOtp');
-    } else if (res.status === 'pending' || res.status === 'new') {
+    } else if (status === 'approved' && !res.otpSent) {
+      // Aprobat dar codul nu s-a putut trimite
+      throw new Error('Contul este aprobat dar codul nu s-a putut trimite pe email. Verifica adresa de email.');
+    } else if (status === 'pending' || status === 'new') {
       showView('vPending'); startPoll();
-      if (res.status === 'new') toast('✉ Solicitare trimisă spre aprobare!');
-    } else if (res.status === 'denied') {
+      if (status === 'new') toast('✉ Solicitare trimisă spre aprobare!');
+    } else if (status === 'denied') {
       showView('vDenied');
     } else {
-      throw new Error(res.error || 'Răspuns necunoscut: ' + res.status);
+      throw new Error('Status necunoscut primit: ' + status);
     }
   } catch(e) {
     showView('vEmail');
