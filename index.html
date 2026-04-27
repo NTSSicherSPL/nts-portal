@@ -165,7 +165,7 @@ tr:hover td{background:rgba(0,170,255,.02);}
 .cert-acts{display:flex;gap:5px;flex-shrink:0;}
 .cert-btn{padding:6px 11px;border:1px solid var(--b2);border-radius:6px;background:transparent;color:var(--accent);font-family:'Rajdhani',sans-serif;font-size:.75rem;font-weight:600;letter-spacing:.05em;cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;gap:4px;transition:all .2s;}
 .cert-btn:hover{background:rgba(0,170,255,.1);border-color:var(--accent);}
-.cert-btn.nolink{color:var(--dim);border-color:var(--b);cursor:default;pointer-events:none;}
+
 .cert-edit-btn{padding:6px 9px;background:transparent;border:1px solid var(--b);border-radius:6px;color:var(--dim);cursor:pointer;font-size:.82rem;transition:all .2s;}
 .cert-edit-btn:hover{border-color:var(--b2);color:var(--text);}
 .cert-edit-row{width:100%;display:none;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap;}
@@ -1289,74 +1289,45 @@ function resetReqForm() {
 // ╚══════════════════════════════════════════╝
 const PLAN_URL_DEFAULT = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRLEHiuD5sC3CtFx_vlHt9Cdg0q-XmmyQekp2-AUoysdUqVSMAFAzf8Xo4k337GYw/pubhtml';
 
-// GID map — se completează automat din fetch la pubhtml
+// Real GID map extracted directly from the published sheet
 const PLAN_GID_MAP = {"KW03": "1014315902", "KW04": "1856886874", "KW05": "108324973", "KW06": "763291193", "KW07": "91102157", "KW08": "1688520736", "KW09": "84537899", "KW10": "1302325059", "KW11": "1975033641", "KW12": "1061181002", "KW13": "1331110351", "KW14": "1818135625", "KW15": "939295662", "KW16": "1581976862", "KW17": "1779880058", "KW18": "1194226"};
 const PLAN_SHEET_NAMES = ["KW03", "KW04", "KW05", "KW06", "KW07", "KW08", "KW09", "KW10", "KW11", "KW12", "KW13", "KW14", "KW15", "KW16", "KW17", "KW18"];
 
-let planCurrentIdx = 0;
-let planSheetsLoaded = false; // flag — am extras deja GID-urile din pubhtml?
-
-// Extrage toate sheet-urile (nume + gid) din pagina pubhtml Google Sheets
-async function fetchPlanSheets() {
-  try {
-    const resp = await fetch(PLAN_URL_DEFAULT, { cache: 'no-cache' });
-    if (!resp.ok) return;
-    const html = await resp.text();
-    // Google pubhtml contine: <li id="sheet-button-NNN" ...>NUMEFOI</li>
-    // SAU in scriptul JSON: {"name":"KW19","id":NNNN}
-    // Metoda 1: cauta pattern-ul din li#sheet-button
-    const liRe = /id="sheet-button-(\d+)"[^>]*>\s*([^<]+)\s*<\/li>/g;
-    let m;
-    const found = [];
-    while ((m = liRe.exec(html)) !== null) {
-      const gid = m[1];
-      const name = m[2].trim();
-      if (/^KW\d{2}$/i.test(name)) found.push({ name, gid });
-    }
-    if (found.length === 0) {
-      // Metoda 2: cauta in JSON embeded {"name":"KW19","id":NNNN}
-      const jsonRe = /\\"name\\":\\s*\\"(KW\d{2})\\"[^}]*\\"id\\":\\s*(\d+)/gi;
-      while ((m = jsonRe.exec(html)) !== null) {
-        found.push({ name: m[1], gid: m[2] });
-      }
-    }
-    if (found.length > 0) {
-      found.forEach(s => { PLAN_GID_MAP[s.name] = s.gid; });
-      const names = found.map(s => s.name).sort();
-      // Adauga in PLAN_SHEET_NAMES orice KW nou
-      names.forEach(n => { if (!PLAN_SHEET_NAMES.includes(n)) PLAN_SHEET_NAMES.push(n); });
-      PLAN_SHEET_NAMES.sort();
-      planSheetsLoaded = true;
-    }
-  } catch(e) { /* silently fail */ }
-}
+let planCurrentIdx = 0; // default KW03
 
 function renderPlan() {
-  if (!gData.plan_url) gData.plan_url = PLAN_URL_DEFAULT;
+  // Use dynamic sheets from GSheets API if available, fallback to hardcoded
+  const dynamicSheets = (gData.planSheets && gData.planSheets.length > 0)
+    ? gData.planSheets.filter(s => /^KW\d{2}$/i.test(s.name))
+    : PLAN_SHEET_NAMES.map(name => ({ name, gid: PLAN_GID_MAP[name] }));
 
-  // Extrage GID-urile live din pubhtml (o singura data per sesiune)
-  if (!planSheetsLoaded) {
-    fetchPlanSheets().then(() => _renderPlanUI());
-  } else {
-    _renderPlanUI();
+  if (dynamicSheets.length > 0) {
+    // Sync GID map and name list with live data
+    dynamicSheets.forEach(s => { PLAN_GID_MAP[s.name] = String(s.gid); });
+    const newNames = dynamicSheets.map(s => s.name);
+    // Rebuild dropdown only if sheets changed
+    const sel = document.getElementById('planSelect');
+    if (sel) {
+      const currentNames = [...sel.options].map(o => o.value);
+      if (JSON.stringify(currentNames) !== JSON.stringify(newNames)) {
+        sel.innerHTML = newNames
+          .map(n => `<option value="${n}">📅  Săptămâna ${n.replace('KW','')}</option>`)
+          .join('');
+      }
+    }
+    PLAN_SHEET_NAMES.length = 0;
+    newNames.forEach(n => PLAN_SHEET_NAMES.push(n));
   }
-}
 
-function _renderPlanUI() {
   // Auto-select current ISO week
   const wk = getISOWeek(new Date());
   const kwName = 'KW' + String(wk).padStart(2,'0');
   const found = PLAN_SHEET_NAMES.indexOf(kwName);
-  planCurrentIdx = found >= 0 ? found : PLAN_SHEET_NAMES.length - 1;
+  planCurrentIdx = found >= 0 ? found : 0;
 
-  // Rebuild dropdown
   const sel = document.getElementById('planSelect');
-  if (sel) {
-    sel.innerHTML = PLAN_SHEET_NAMES
-      .map(n => `<option value="${n}">📅  Săptămâna ${n.replace('KW','')}</option>`)
-      .join('');
-    sel.value = PLAN_SHEET_NAMES[planCurrentIdx];
-  }
+  if (sel) sel.value = PLAN_SHEET_NAMES[planCurrentIdx] || PLAN_SHEET_NAMES[0];
+  if (!gData.plan_url) gData.plan_url = PLAN_URL_DEFAULT;
 
   loadPlanSheet(planCurrentIdx);
 }
@@ -1372,33 +1343,11 @@ function loadPlanSheet(idx) {
   planCurrentIdx = idx;
   const sheetName = PLAN_SHEET_NAMES[idx];
   const gid = PLAN_GID_MAP[sheetName];
+  // Use #gid= hash — this is how Google pubhtml navigates between sheets
+  const url = PLAN_URL_DEFAULT + '#gid=' + gid;
 
   const wrap = document.getElementById('planWrap');
-  if (gid) {
-    const url = PLAN_URL_DEFAULT + '#gid=' + gid;
-    wrap.innerHTML = '<iframe id="planFrame" src="' + url + '" style="width:100%;height:520px;border:none;display:block;" allowfullscreen></iframe>';
-  } else {
-    // GID necunoscut — incearca sa re-fetch si afiseaza placeholder
-    const wkNum = sheetName.replace('KW','');
-    wrap.innerHTML = '<div class="frame-ph"><div class="bi">⏳</div><p>Se cauta planul pentru <strong>săptămâna ' + wkNum + '</strong>…</p></div>';
-    fetchPlanSheets().then(() => {
-      const newGid = PLAN_GID_MAP[sheetName];
-      if (newGid) {
-        const url = PLAN_URL_DEFAULT + '#gid=' + newGid;
-        wrap.innerHTML = '<iframe id="planFrame" src="' + url + '" style="width:100%;height:520px;border:none;display:block;" allowfullscreen></iframe>';
-        // Actualizeaza dropdown
-        const sel = document.getElementById('planSelect');
-        if (sel) {
-          sel.innerHTML = PLAN_SHEET_NAMES
-            .map(n => `<option value="${n}">📅  Săptămâna ${n.replace('KW','')}</option>`)
-            .join('');
-          sel.value = sheetName;
-        }
-      } else {
-        wrap.innerHTML = '<div class="frame-ph"><div class="bi">📅</div><p>Planul pentru <strong>săptămâna ' + wkNum + '</strong> nu a fost adăugat încă în Google Sheets.</p></div>';
-      }
-    });
-  }
+  wrap.innerHTML = '<iframe id="planFrame" src="' + url + '" style="width:100%;height:520px;border:none;display:block;" allowfullscreen></iframe>';
 
   // Sync dropdown
   const sel = document.getElementById('planSelect');
@@ -1541,9 +1490,7 @@ function renderCert() {
           ${note?`<div class="cert-note-txt">📝 ${note}</div>`:''}
         </div>
         <div class="cert-acts">
-          ${lnk
-            ?`<a href="${lnk}" target="_blank" class="cert-btn" title="Vezi certificat">🏅</a>`
-            :''}
+          ${lnk?`<a href="${lnk}" target="_blank" class="cert-btn" title="Vezi certificat">🏅 Certificat</a>`:''}
           <button class="cert-edit-btn" onclick="togCE('${t.ini}')" title="Editează">✏️</button>
         </div>
         <div class="cert-edit-row" id="ce-${t.ini}">
