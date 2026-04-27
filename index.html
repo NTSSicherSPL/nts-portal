@@ -863,7 +863,7 @@ function initApp() {
   const now = new Date();
   document.getElementById('reportDate').value = now.toISOString().split('T')[0];
   buildTech(); buildPills(); buildMonths();
-  syncAll(); injectMF();
+  syncAll(true); injectMF();
   setInterval(() => syncAll(true), 3 * 60 * 1000);
   setInterval(() => silentRecheck(), 30 * 60 * 1000);
 }
