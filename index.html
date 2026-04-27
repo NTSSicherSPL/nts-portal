@@ -1482,22 +1482,38 @@ function renderCert() {
       const lnk  = entry.url  || '';
       const note = entry.nota || '';
       const d=document.createElement('div'); d.className='cert-mbr'; d.id='cm-'+t.ini;
-      d.innerHTML=`
-        <div class="cert-av">${t.ini}</div>
-        <div class="cert-info">
-          <div class="cert-name">${t.name}${t.pri?'<span class="star" style="margin-left:5px;">★</span>':''}</div>
-          <div class="cert-sub">${tn}</div>
-          ${note?`<div class="cert-note-txt">📝 ${note}</div>`:''}
-        </div>
-        <div class="cert-acts">
-          ${lnk?`<a href="${lnk}" target="_blank" class="cert-btn" title="Vezi certificat">🏅 Certificat</a>`:''}
-          <button class="cert-edit-btn" onclick="togCE('${t.ini}')" title="Editează">✏️</button>
-        </div>
-        <div class="cert-edit-row" id="ce-${t.ini}">
-          <input type="text" id="cu-${t.ini}" placeholder="https://drive.google.com/…" value="${lnk}">
-          <input type="text" id="cn-${t.ini}" placeholder="Notă (ex: valabil 2025)" value="${note}" style="max-width:160px;">
-          <button class="btn-sm" onclick="saveCert('${t.ini}')">💾 Salvează</button>
-        </div>`;
+      // Daca nu exista link: cardul apare gol — fara avatar, fara info, fara badge
+      // Doar butonul de editare ✏️ ramane vizibil discret pentru a putea adauga link-ul
+      if (lnk) {
+        d.innerHTML=`
+          <div class="cert-av">${t.ini}</div>
+          <div class="cert-info">
+            <div class="cert-name">${t.name}${t.pri?'<span class="star" style="margin-left:5px;">★</span>':''}</div>
+            <div class="cert-sub">${tn}</div>
+            ${note?`<div class="cert-note-txt">📝 ${note}</div>`:''}
+          </div>
+          <div class="cert-acts">
+            <a href="${lnk}" target="_blank" class="cert-btn" title="Vezi certificat">🏅 Certificat</a>
+            <button class="cert-edit-btn" onclick="togCE('${t.ini}')" title="Editează">✏️</button>
+          </div>
+          <div class="cert-edit-row" id="ce-${t.ini}">
+            <input type="text" id="cu-${t.ini}" placeholder="https://drive.google.com/…" value="${lnk}">
+            <input type="text" id="cn-${t.ini}" placeholder="Notă (ex: valabil 2025)" value="${note}" style="max-width:160px;">
+            <button class="btn-sm" onclick="saveCert('${t.ini}')">💾 Salvează</button>
+          </div>`;
+      } else {
+        // Fara link: card gol, doar editare discreta
+        d.style.cssText = 'background:transparent;border-color:transparent;padding:4px 12px;';
+        d.innerHTML=`
+          <div class="cert-acts" style="width:100%;justify-content:flex-end;">
+            <button class="cert-edit-btn" onclick="togCE('${t.ini}')" title="Adaugă certificat" style="opacity:.35;font-size:.7rem;">✏️ ${t.ini}</button>
+          </div>
+          <div class="cert-edit-row" id="ce-${t.ini}">
+            <input type="text" id="cu-${t.ini}" placeholder="https://drive.google.com/…" value="">
+            <input type="text" id="cn-${t.ini}" placeholder="Notă (ex: valabil 2025)" value="" style="max-width:160px;">
+            <button class="btn-sm" onclick="saveCert('${t.ini}')">💾 Salvează</button>
+          </div>`;
+      }
       g.appendChild(d);
     });
   });
