@@ -30,11 +30,11 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 body::after{content:'';position:fixed;top:-200px;left:50%;transform:translateX(-50%);width:900px;height:420px;background:radial-gradient(ellipse,rgba(0,100,200,.15) 0%,transparent 70%);z-index:0;pointer-events:none;}
 
 /* ══ HEADER ══ */
-.hdr{position:relative;z-index:10;background:rgba(10,22,40,.98);border-bottom:1px solid var(--b);padding:12px 14px;display:flex;align-items:center;gap:11px;flex-shrink:0;}
-.logo-img{height:36px;width:auto;filter:brightness(1.1) drop-shadow(0 0 10px rgba(0,170,255,.35));mix-blend-mode:lighten;}
+.hdr{position:relative;z-index:10;background:rgba(10,22,40,.98);border-bottom:1px solid var(--b);padding:10px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0;overflow:hidden;}
+.logo-img{height:34px;width:auto;filter:brightness(1.1) drop-shadow(0 0 10px rgba(0,170,255,.35));mix-blend-mode:lighten;flex-shrink:0;}
 .logo-fb{width:38px;height:38px;border-radius:8px;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-family:'Rajdhani',sans-serif;font-size:.95rem;font-weight:700;color:#fff;flex-shrink:0;display:none;}
-.hdr-t{flex:1;}
-.hdr-name{font-family:'Rajdhani',sans-serif;font-size:1.25rem;font-weight:700;letter-spacing:.06em;background:linear-gradient(135deg,#00aaff,#fff 55%,#f0a500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1;}
+.hdr-t{flex:1;min-width:0;}
+.hdr-name{font-family:'Rajdhani',sans-serif;font-size:1.1rem;font-weight:700;letter-spacing:.06em;background:linear-gradient(135deg,#00aaff,#fff 55%,#f0a500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .hdr-sub{font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-top:1px;}
 .sync-chip{display:flex;align-items:center;gap:5px;font-size:.65rem;color:var(--dim);background:rgba(0,170,255,.05);border:1px solid var(--b);border-radius:20px;padding:4px 9px;white-space:nowrap;flex-shrink:0;cursor:pointer;transition:all .2s;}
 .sync-chip:hover{border-color:var(--accent);color:var(--accent);}
@@ -531,22 +531,23 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
     <div class="hdr-name">NTS Group Portal</div>
     <div class="hdr-sub">Portal Tehnicieni</div>
   </div>
-  <div class="usr-chip" id="usrChip" onclick="logoutUser()">
-    <div class="u-avfb" id="uAvFb"></div>
-    <span class="u-nm" id="uNm"></span>
-    <div class="u-tip">Deconectare</div>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
+    <div class="usr-chip" id="usrChip" onclick="logoutUser()">
+      <div class="u-avfb" id="uAvFb"></div>
+      <span class="u-nm" id="uNm"></span>
+      <div class="u-tip">Deconectare</div>
+    </div>
+    <div class="adm-chip" id="admChip" onclick="openAdmPanel()">
+      👑 Admin
+      <div class="adm-bdg" id="admBdg">0</div>
+    </div>
+    <div class="sync-chip" onclick="syncAll()" title="Sincronizează acum" style="width:100%;justify-content:flex-end;">
+      <div class="sync-dot" id="syncDot"></div>
+      <span id="syncLbl">Sincronizat</span>
+    </div>
   </div>
-  <div class="adm-chip" id="admChip" onclick="openAdmPanel()">
-    👑 Admin
-    <div class="adm-bdg" id="admBdg">0</div>
-  </div>
-  <div class="sync-chip" onclick="syncAll()" title="Sincronizează acum">
-    <div class="sync-dot" id="syncDot"></div>
-    <span id="syncLbl">Sync</span>
-  </div>
-  <div class="sync-chip" onclick="refreshConexiune()" id="refreshBtn" title="Refresh conexiune" style="margin-left:4px;">
-    <span style="font-size:.75rem;line-height:1;" id="refreshIcon">🔄</span>
-    <span>Refresh</span>
+  <div class="sync-chip" onclick="refreshConexiune()" id="refreshBtn" title="Refresh conexiune" style="margin-left:4px;padding:6px 8px;flex-shrink:0;">
+    <span style="font-size:.85rem;line-height:1;" id="refreshIcon">🔄</span>
   </div>
 </div>
 
@@ -1490,8 +1491,8 @@ function renderCert() {
         </div>
         <div class="cert-acts">
           ${lnk
-            ?`<a href="${lnk}" target="_blank" class="cert-btn">🏅 Certificare</a>`
-            :`<span class="cert-btn nolink">🔗 Fără link</span>`}
+            ?`<a href="${lnk}" target="_blank" class="cert-btn">🏅</a>`
+            :''}
           <button class="cert-edit-btn" onclick="togCE('${t.ini}')" title="Editează">✏️</button>
         </div>
         <div class="cert-edit-row" id="ce-${t.ini}">
