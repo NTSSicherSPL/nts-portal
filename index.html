@@ -863,7 +863,7 @@ function initApp() {
   const now = new Date();
   document.getElementById('reportDate').value = now.toISOString().split('T')[0];
   buildTech(); buildPills(); buildMonths();
-  syncAll(true); injectMF();
+  syncAll(); injectMF();
   setInterval(() => syncAll(true), 3 * 60 * 1000);
   setInterval(() => silentRecheck(), 30 * 60 * 1000);
 }
@@ -1296,37 +1296,42 @@ const PLAN_SHEET_NAMES = ["KW03", "KW04", "KW05", "KW06", "KW07", "KW08", "KW09"
 let planCurrentIdx = 0; // default KW03
 
 function renderPlan() {
-  // Use dynamic sheets from GSheets API if available, fallback to hardcoded
-  const dynamicSheets = (gData.planSheets && gData.planSheets.length > 0)
-    ? gData.planSheets.filter(s => /^KW\d{2}$/i.test(s.name))
-    : PLAN_SHEET_NAMES.map(name => ({ name, gid: PLAN_GID_MAP[name] }));
-
-  if (dynamicSheets.length > 0) {
-    // Sync GID map and name list with live data
-    dynamicSheets.forEach(s => { PLAN_GID_MAP[s.name] = String(s.gid); });
-    const newNames = dynamicSheets.map(s => s.name);
-    // Rebuild dropdown only if sheets changed
-    const sel = document.getElementById('planSelect');
-    if (sel) {
-      const currentNames = [...sel.options].map(o => o.value);
-      if (JSON.stringify(currentNames) !== JSON.stringify(newNames)) {
-        sel.innerHTML = newNames
-          .map(n => `<option value="${n}">📅  Săptămâna ${n.replace('KW','')}</option>`)
-          .join('');
-      }
-    }
-    PLAN_SHEET_NAMES.length = 0;
-    newNames.forEach(n => PLAN_SHEET_NAMES.push(n));
+  // Build complete list of KW names up to current week + 2
+  const currentWk = getISOWeek(new Date());
+  const currentKW = 'KW' + String(currentWk).padStart(2,'0');
+  const maxWk = Math.max(currentWk + 2, 18);
+  const allKWNames = [];
+  for (let w = 3; w <= maxWk; w++) {
+    allKWNames.push('KW' + String(w).padStart(2,'0'));
   }
 
-  // Auto-select current ISO week
-  const wk = getISOWeek(new Date());
-  const kwName = 'KW' + String(wk).padStart(2,'0');
-  const found = PLAN_SHEET_NAMES.indexOf(kwName);
-  planCurrentIdx = found >= 0 ? found : 0;
+  // Use dynamic sheets from GSheets API if available
+  if (gData.planSheets && gData.planSheets.length > 0) {
+    const apiSheets = gData.planSheets.filter(s => /^KW\d{2}$/i.test(s.name));
+    apiSheets.forEach(s => { if (s.gid) PLAN_GID_MAP[s.name] = String(s.gid); });
+    // Add any API sheet names not already in list
+    apiSheets.forEach(s => { if (!allKWNames.includes(s.name)) allKWNames.push(s.name); });
+    allKWNames.sort();
+  }
 
+  // Rebuild dropdown if changed
   const sel = document.getElementById('planSelect');
-  if (sel) sel.value = PLAN_SHEET_NAMES[planCurrentIdx] || PLAN_SHEET_NAMES[0];
+  if (sel) {
+    const currentNames = [...sel.options].map(o => o.value);
+    if (JSON.stringify(currentNames) !== JSON.stringify(allKWNames)) {
+      sel.innerHTML = allKWNames
+        .map(n => `<option value="${n}">\u{1F4C5}  S\u0103pt\u0103m\u00e2na ${n.replace('KW','')}${PLAN_GID_MAP[n] ? '' : ' \u26a0'}</option>`)
+        .join('');
+    }
+  }
+  PLAN_SHEET_NAMES.length = 0;
+  allKWNames.forEach(n => PLAN_SHEET_NAMES.push(n));
+
+  // Auto-select current ISO week
+  const found = PLAN_SHEET_NAMES.indexOf(currentKW);
+  planCurrentIdx = found >= 0 ? found : PLAN_SHEET_NAMES.length - 1;
+
+  if (sel) sel.value = PLAN_SHEET_NAMES[planCurrentIdx];
   if (!gData.plan_url) gData.plan_url = PLAN_URL_DEFAULT;
 
   loadPlanSheet(planCurrentIdx);
@@ -1343,11 +1348,17 @@ function loadPlanSheet(idx) {
   planCurrentIdx = idx;
   const sheetName = PLAN_SHEET_NAMES[idx];
   const gid = PLAN_GID_MAP[sheetName];
-  // Use #gid= hash — this is how Google pubhtml navigates between sheets
-  const url = PLAN_URL_DEFAULT + '#gid=' + gid;
 
   const wrap = document.getElementById('planWrap');
-  wrap.innerHTML = '<iframe id="planFrame" src="' + url + '" style="width:100%;height:520px;border:none;display:block;" allowfullscreen></iframe>';
+  if (gid) {
+    // Use #gid= hash — this is how Google pubhtml navigates between sheets
+    const url = PLAN_URL_DEFAULT + '#gid=' + gid;
+    wrap.innerHTML = '<iframe id="planFrame" src="' + url + '" style="width:100%;height:520px;border:none;display:block;" allowfullscreen></iframe>';
+  } else {
+    // GID not yet available for this week — show placeholder
+    const wkNum = sheetName.replace('KW','');
+    wrap.innerHTML = '<div class="frame-ph"><div class="bi">📅</div><p>Planul pentru <strong>săptămâna ' + wkNum + '</strong> nu a fost adăugat încă în Google Sheets.<br><br>Revino mai târziu sau contactează administratorul.</p></div>';
+  }
 
   // Sync dropdown
   const sel = document.getElementById('planSelect');
