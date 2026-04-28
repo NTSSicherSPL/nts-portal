@@ -625,55 +625,51 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
   <!-- ── PAGE 1: PLAN SĂPTĂMÂNAL ── -->
   <div class="page" id="p1">
 
-    <!-- Navigator săptămâni -->
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-      <button id="planBtnPrev" onclick="planNav(-1)" style="
-        flex-shrink:0;width:56px;height:56px;border-radius:12px;
-        background:var(--card);border:1px solid var(--b2);
-        color:var(--accent);font-size:1.8rem;line-height:1;
-        display:flex;align-items:center;justify-content:center;
-        cursor:pointer;transition:all .2s;
-        -webkit-tap-highlight-color:transparent;">&#8249;</button>
-
+    <!-- Label săptămână curentă -->
+    <div style="display:flex;align-items:center;justify-content:center;margin-bottom:8px;">
       <select id="planSelect" onchange="planSelectSheet(this.value)" style="
-        flex:1;height:56px;font-size:1rem;font-family:'Rajdhani',sans-serif;
+        height:46px;font-size:1rem;font-family:'Rajdhani',sans-serif;
         font-weight:700;letter-spacing:.06em;text-align:center;
         background:var(--card);border:1px solid var(--b2);
-        border-radius:12px;color:var(--text);cursor:pointer;
-        padding:0 12px;">
-        <option value="KW03">📅  Săptămâna 03</option>
-        <option value="KW04">📅  Săptămâna 04</option>
-        <option value="KW05">📅  Săptămâna 05</option>
-        <option value="KW06">📅  Săptămâna 06</option>
-        <option value="KW07">📅  Săptămâna 07</option>
-        <option value="KW08">📅  Săptămâna 08</option>
-        <option value="KW09">📅  Săptămâna 09</option>
-        <option value="KW10">📅  Săptămâna 10</option>
-        <option value="KW11">📅  Săptămâna 11</option>
-        <option value="KW12">📅  Săptămâna 12</option>
-        <option value="KW13">📅  Săptămâna 13</option>
-        <option value="KW14">📅  Săptămâna 14</option>
-        <option value="KW15">📅  Săptămâna 15</option>
-        <option value="KW16">📅  Săptămâna 16</option>
-        <option value="KW17">📅  Săptămâna 17</option>
-        <option value="KW18">📅  Săptămâna 18</option>
+        border-radius:10px;color:var(--text);cursor:pointer;
+        padding:0 14px;max-width:260px;width:100%;">
+        <option value="">📅  Se încarcă...</option>
       </select>
-
-      <button id="planBtnNext" onclick="planNav(1)" style="
-        flex-shrink:0;width:56px;height:56px;border-radius:12px;
-        background:var(--card);border:1px solid var(--b2);
-        color:var(--accent);font-size:1.8rem;line-height:1;
-        display:flex;align-items:center;justify-content:center;
-        cursor:pointer;transition:all .2s;
-        -webkit-tap-highlight-color:transparent;">&#8250;</button>
     </div>
 
-    <!-- Plan iframe -->
-    <div class="card" style="padding:0;overflow:hidden;" id="planWrap">
-      <div class="frame-ph" id="planPh">
+    <!-- Plan iframe + săgeți overlay mari -->
+    <div style="position:relative;border-radius:var(--r);overflow:hidden;border:1px solid var(--b);" id="planWrap">
+
+      <!-- Conținut iframe -->
+      <div class="frame-ph" id="planPh" style="min-height:220px;">
         <div class="bi">📊</div>
         <p>Se încarcă planul săptămânal din Google Sheets…</p>
       </div>
+
+      <!-- Săgeată STÂNGA — overlay mare -->
+      <button id="planBtnPrev" onclick="planNav(-1)" style="
+        position:absolute;left:0;top:0;bottom:0;
+        width:54px;
+        background:linear-gradient(90deg,rgba(10,22,40,.82) 0%,transparent 100%);
+        border:none;border-right:1px solid rgba(0,170,255,.12);
+        color:var(--accent);font-size:2.4rem;line-height:1;
+        display:flex;align-items:center;justify-content:center;
+        cursor:pointer;z-index:10;
+        -webkit-tap-highlight-color:transparent;
+        transition:background .2s;">&#8249;</button>
+
+      <!-- Săgeată DREAPTA — overlay mare -->
+      <button id="planBtnNext" onclick="planNav(1)" style="
+        position:absolute;right:0;top:0;bottom:0;
+        width:54px;
+        background:linear-gradient(270deg,rgba(10,22,40,.82) 0%,transparent 100%);
+        border:none;border-left:1px solid rgba(0,170,255,.12);
+        color:var(--accent);font-size:2.4rem;line-height:1;
+        display:flex;align-items:center;justify-content:center;
+        cursor:pointer;z-index:10;
+        -webkit-tap-highlight-color:transparent;
+        transition:background .2s;">&#8250;</button>
+
     </div>
 
   </div>
@@ -1289,48 +1285,21 @@ function resetReqForm() {
 // ╚══════════════════════════════════════════╝
 const PLAN_URL_DEFAULT = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRLEHiuD5sC3CtFx_vlHt9Cdg0q-XmmyQekp2-AUoysdUqVSMAFAzf8Xo4k337GYw/pubhtml';
 
-// Real GID map extracted directly from the published sheet
-const PLAN_GID_MAP = {"KW03": "1014315902", "KW04": "1856886874", "KW05": "108324973", "KW06": "763291193", "KW07": "91102157", "KW08": "1688520736", "KW09": "84537899", "KW10": "1302325059", "KW11": "1975033641", "KW12": "1061181002", "KW13": "1331110351", "KW14": "1818135625", "KW15": "939295662", "KW16": "1581976862", "KW17": "1779880058", "KW18": "1194226"};
-const PLAN_SHEET_NAMES = ["KW03", "KW04", "KW05", "KW06", "KW07", "KW08", "KW09", "KW10", "KW11", "KW12", "KW13", "KW14", "KW15", "KW16", "KW17", "KW18"];
+// GID-uri cunoscute — extinse automat din gData.planSheets la fiecare sync
+// ✅ Pentru a adăuga o săptămână nouă: adaugă "KWxx":"<gid>" în acest obiect.
+//    GID-ul se găsește în URL-ul foii: ...spreadsheets/d/.../edit#gid=<GID>
+//    Alternativ, GAS poate trimite gData.planSheets cu toate foile automat.
+const PLAN_GID_MAP = {
+  "KW03":"1014315902","KW04":"1856886874","KW05":"108324973","KW06":"763291193",
+  "KW07":"91102157","KW08":"1688520736","KW09":"84537899","KW10":"1302325059",
+  "KW11":"1975033641","KW12":"1061181002","KW13":"1331110351","KW14":"1818135625",
+  "KW15":"939295662","KW16":"1581976862","KW17":"1779880058","KW18":"1194226",
+  "KW19":"0"  // ← GID va fi actualizat automat la primul sync dacă GAS trimite planSheets
+              //   sau îl poți completa manual cu GID-ul real din Google Sheets
+};
 
-let planCurrentIdx = 0; // default KW03
-
-function renderPlan() {
-  // Use dynamic sheets from GSheets API if available, fallback to hardcoded
-  const dynamicSheets = (gData.planSheets && gData.planSheets.length > 0)
-    ? gData.planSheets.filter(s => /^KW\d{2}$/i.test(s.name))
-    : PLAN_SHEET_NAMES.map(name => ({ name, gid: PLAN_GID_MAP[name] }));
-
-  if (dynamicSheets.length > 0) {
-    // Sync GID map and name list with live data
-    dynamicSheets.forEach(s => { PLAN_GID_MAP[s.name] = String(s.gid); });
-    const newNames = dynamicSheets.map(s => s.name);
-    // Rebuild dropdown only if sheets changed
-    const sel = document.getElementById('planSelect');
-    if (sel) {
-      const currentNames = [...sel.options].map(o => o.value);
-      if (JSON.stringify(currentNames) !== JSON.stringify(newNames)) {
-        sel.innerHTML = newNames
-          .map(n => `<option value="${n}">📅  Săptămâna ${n.replace('KW','')}</option>`)
-          .join('');
-      }
-    }
-    PLAN_SHEET_NAMES.length = 0;
-    newNames.forEach(n => PLAN_SHEET_NAMES.push(n));
-  }
-
-  // Auto-select current ISO week
-  const wk = getISOWeek(new Date());
-  const kwName = 'KW' + String(wk).padStart(2,'0');
-  const found = PLAN_SHEET_NAMES.indexOf(kwName);
-  planCurrentIdx = found >= 0 ? found : 0;
-
-  const sel = document.getElementById('planSelect');
-  if (sel) sel.value = PLAN_SHEET_NAMES[planCurrentIdx] || PLAN_SHEET_NAMES[0];
-  if (!gData.plan_url) gData.plan_url = PLAN_URL_DEFAULT;
-
-  loadPlanSheet(planCurrentIdx);
-}
+let PLAN_SHEET_NAMES = [];
+let planCurrentIdx   = 0;
 
 function getISOWeek(d) {
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -1339,25 +1308,84 @@ function getISOWeek(d) {
   return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
 }
 
+function renderPlan() {
+  // 1. Adauga GID-uri noi primite de la server
+  if (gData.planSheets && gData.planSheets.length > 0) {
+    gData.planSheets
+      .filter(s => /^KW\d{2}$/i.test(s.name))
+      .forEach(s => { PLAN_GID_MAP[s.name.toUpperCase()] = String(s.gid); });
+  }
+
+  // 2. Construieste lista DOAR din GID-uri cunoscute, sortata
+  const allNames = Object.keys(PLAN_GID_MAP)
+    .filter(k => /^KW\d{2}$/.test(k))
+    .sort();
+  PLAN_SHEET_NAMES = allNames;
+
+  // 3. Rebuildeaza dropdown
+  const sel = document.getElementById('planSelect');
+  if (sel) {
+    sel.innerHTML = allNames
+      .map(n => `<option value="${n}">📅  Săptămâna ${n.replace('KW','')}</option>`)
+      .join('');
+  }
+
+  // 4. Auto-selecteaza saptamana curenta (sau ultima disponibila)
+  const currentKW = 'KW' + String(getISOWeek(new Date())).padStart(2,'0');
+  const found = PLAN_SHEET_NAMES.indexOf(currentKW);
+  planCurrentIdx = found >= 0 ? found : PLAN_SHEET_NAMES.length - 1;
+
+  if (sel) sel.value = PLAN_SHEET_NAMES[planCurrentIdx];
+  loadPlanSheet(planCurrentIdx);
+}
+
 function loadPlanSheet(idx) {
+  if (idx < 0 || idx >= PLAN_SHEET_NAMES.length) return;
   planCurrentIdx = idx;
   const sheetName = PLAN_SHEET_NAMES[idx];
   const gid = PLAN_GID_MAP[sheetName];
-  // Use #gid= hash — this is how Google pubhtml navigates between sheets
-  const url = PLAN_URL_DEFAULT + '#gid=' + gid;
 
   const wrap = document.getElementById('planWrap');
-  wrap.innerHTML = '<iframe id="planFrame" src="' + url + '" style="width:100%;height:520px;border:none;display:block;" allowfullscreen></iframe>';
-
-  // Sync dropdown
-  const sel = document.getElementById('planSelect');
-  if (sel) sel.value = sheetName;
-
-  // Update arrow states
   const prev = document.getElementById('planBtnPrev');
   const next = document.getElementById('planBtnNext');
-  if (prev) { prev.style.opacity = idx === 0 ? '0.3' : '1'; prev.style.pointerEvents = idx === 0 ? 'none' : 'auto'; }
-  if (next) { next.style.opacity = idx === PLAN_SHEET_NAMES.length-1 ? '0.3' : '1'; next.style.pointerEvents = idx === PLAN_SHEET_NAMES.length-1 ? 'none' : 'auto'; }
+
+  // Curată conținut vechi (iframe sau placeholder KW neconfigurate)
+  const oldIframe = wrap.querySelector('iframe');
+  if (oldIframe) oldIframe.remove();
+  const oldPh = wrap.querySelector('#planPh, .plan-ph-inner');
+  if (oldPh) oldPh.remove();
+
+  // Sync dropdown
+  const sel2 = document.getElementById('planSelect');
+  if (sel2) sel2.value = sheetName;
+
+  // Vizibilitate săgeți
+  if (prev) prev.style.opacity = idx === 0 ? '0.25' : '1';
+  if (next) next.style.opacity = idx === PLAN_SHEET_NAMES.length - 1 ? '0.25' : '1';
+
+  // GID "0" = placeholder (foaia nu e încă configurată)
+  if (!gid || gid === '0') {
+    const msgEl = document.createElement('div');
+    msgEl.className = 'frame-ph plan-ph-inner';
+    msgEl.style.cssText = 'min-height:220px;';
+    msgEl.innerHTML = '<div class="bi">📋</div>' +
+      '<p style="color:var(--gold);font-weight:600;">Săptămâna ' + sheetName + ' — în pregătire</p>' +
+      '<p style="font-size:.75rem;opacity:.7;margin-top:6px;">Planul apare automat după sincronizare.<br>Cere admin să adauge GID-ul foii.</p>';
+    if (next && next.parentNode === wrap) wrap.insertBefore(msgEl, next);
+    else wrap.appendChild(msgEl);
+    return;
+  }
+
+  const url = PLAN_URL_DEFAULT + '#gid=' + gid;
+  const iframe = document.createElement('iframe');
+  iframe.src = url;
+  iframe.style.cssText = 'width:100%;height:520px;border:none;display:block;';
+  iframe.allowFullscreen = true;
+  if (next && next.parentNode === wrap) {
+    wrap.insertBefore(iframe, next);
+  } else {
+    wrap.appendChild(iframe);
+  }
 }
 
 function planNav(dir) {
@@ -1370,7 +1398,6 @@ function planSelectSheet(sheetName) {
   const idx = PLAN_SHEET_NAMES.indexOf(sheetName);
   if (idx >= 0) loadPlanSheet(idx);
 }
-
 // ╔══════════════════════════════════════════╗
 // ║  PONTAJ                         ║
 // ╚══════════════════════════════════════════╝
