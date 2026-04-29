@@ -1061,7 +1061,7 @@ async function submitRep() {
   const pl={
     action:       'addRaport',
     timestamp:    new Date().toISOString(),
-    data:         dt,
+    data:         (dt ? dt + 'T12:00:00' : dt),
     contractor:   ctr,
     technicieni:  [...selTechs].join(', '),
     nrSite:       siteNum || '—',
