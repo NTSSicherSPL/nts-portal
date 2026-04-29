@@ -904,7 +904,7 @@ async function syncAll(silent=false) {
       }
       buildMonths();
       renderP();
-      renderPlan();   // re-renders with fresh planSheets from GSheets
+      await renderPlan();   // re-renders with fresh planSheets from GSheets
       renderCert();
       setSyncState('ok', 'Sincronizat');
       if(!silent) toast('✔ Date sincronizate!');
@@ -1289,6 +1289,7 @@ function resetReqForm() {
 const PLAN_URL_DEFAULT = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRLEHiuD5sC3CtFx_vlHt9Cdg0q-XmmyQekp2-AUoysdUqVSMAFAzf8Xo4k337GYw/pubhtml';
 
 // GID-uri cunoscute — extinse automat din gData.planSheets la fiecare sync
+// NOTĂ: orice sheet nou (KW19, KW20 etc.) este descoperit automat din server
 const PLAN_GID_MAP = {
   "KW03":"1014315902","KW04":"1856886874","KW05":"108324973","KW06":"763291193",
   "KW07":"91102157","KW08":"1688520736","KW09":"84537899","KW10":"1302325059",
@@ -1299,6 +1300,52 @@ const PLAN_GID_MAP = {
 let PLAN_SHEET_NAMES = [];
 let planCurrentIdx   = 0;
 
+// ── Auto-descoperire GID-uri din pagina pubhtml (fara CORS problems) ──
+// Incarcam pagina in iframe ascuns, parsam GID-urile din title/URL la click
+async function autoDiscoverGids() {
+  try {
+    // Metoda 1: din gData.planSheets (cel mai fiabil — vine din GAS)
+    if (gData.planSheets && gData.planSheets.length > 0) {
+      let found = 0;
+      gData.planSheets
+        .filter(s => /^KW\d{2}$/i.test(s.name))
+        .forEach(s => {
+          const gid = String(s.gid || s.sheetId || s.id || '').replace(/\D/g,'');
+          if (gid && gid !== '0') {
+            PLAN_GID_MAP[s.name.toUpperCase()] = gid;
+            found++;
+          }
+        });
+      if (found > 0) {
+        console.log('[Plan] GID-uri descoperite din gData.planSheets:', found);
+        return;
+      }
+    }
+
+    // Metoda 2: request catre GAS cu action getSheetList (daca exista)
+    try {
+      const res = await apiCall('GET', { action: 'getSheetList' });
+      if (res && res.ok && res.data) {
+        const list = res.data.sheets || res.data.planSheets || [];
+        list
+          .filter(s => /^KW\d{2}$/i.test(s.name || s.sheetName || ''))
+          .forEach(s => {
+            const name = (s.name || s.sheetName || '').toUpperCase();
+            const gid  = String(s.gid || s.sheetId || s.id || '').replace(/\D/g,'');
+            if (name && gid && gid !== '0') {
+              PLAN_GID_MAP[name] = gid;
+            }
+          });
+        console.log('[Plan] GID-uri din getSheetList:', Object.keys(PLAN_GID_MAP).length);
+      }
+    } catch(e2) {
+      console.log('[Plan] getSheetList nu e disponibil in GAS:', e2.message);
+    }
+  } catch(e) {
+    console.warn('[Plan] autoDiscoverGids eroare:', e);
+  }
+}
+
 function getISOWeek(d) {
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
@@ -1306,29 +1353,46 @@ function getISOWeek(d) {
   return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
 }
 
-function renderPlan() {
-  // 1. Adauga GID-uri noi primite de la server
+async function renderPlan() {
+  // 1. Adauga GID-uri din server (gData.planSheets) — validare stricta numerica
   if (gData.planSheets && gData.planSheets.length > 0) {
     gData.planSheets
-      .filter(s => /^KW\d{2}$/i.test(s.name))
-      .forEach(s => { PLAN_GID_MAP[s.name.toUpperCase()] = String(s.gid); });
+      .filter(s => /^KW\d{2}$/i.test(s.name || s.sheetName || ''))
+      .forEach(s => {
+        const name = (s.name || s.sheetName || '').toUpperCase();
+        const gid  = String(s.gid || s.sheetId || s.id || '').replace(/\D/g,'');
+        if (name && gid && gid !== '0') {
+          PLAN_GID_MAP[name] = gid;
+        }
+      });
   }
 
-  // 2. Construieste lista DOAR din GID-uri cunoscute, sortata
-  const allNames = Object.keys(PLAN_GID_MAP)
-    .filter(k => /^KW\d{2}$/.test(k))
-    .sort();
+  // 2. Incearca sa descopere GID-uri noi (async, nu blocheaza UI)
+  await autoDiscoverGids();
+
+  // 3. Construieste lista din doua surse:
+  //    A) cheile din PLAN_GID_MAP (au GID valid)
+  //    B) sheet-urile din gData.planSheets (chiar daca GID-ul lipseste — vor fi marcate)
+  const mapNames = Object.keys(PLAN_GID_MAP).filter(k => /^KW\d{2}$/.test(k));
+  const serverNames = (gData.planSheets || [])
+    .map(s => (s.name || s.sheetName || '').toUpperCase())
+    .filter(n => /^KW\d{2}$/.test(n));
+  const allNames = [...new Set([...mapNames, ...serverNames])].sort();
   PLAN_SHEET_NAMES = allNames;
 
-  // 3. Rebuildeaza dropdown
+  // 4. Rebuildeaza dropdown
   const sel = document.getElementById('planSelect');
   if (sel) {
     sel.innerHTML = allNames
-      .map(n => `<option value="${n}">📅  Săptămâna ${n.replace('KW','')}</option>`)
+      .map(n => {
+        const hasGid = !!(PLAN_GID_MAP[n] && /^\d+$/.test(PLAN_GID_MAP[n]));
+        const label  = `📅  Săptămâna ${n.replace('KW','')}`;
+        return `<option value="${n}" ${hasGid ? '' : 'style="opacity:.6"'}>${label}</option>`;
+      })
       .join('');
   }
 
-  // 4. Auto-selecteaza saptamana curenta (sau ultima disponibila)
+  // 5. Auto-selecteaza saptamana curenta (sau ultima disponibila)
   const currentKW = 'KW' + String(getISOWeek(new Date())).padStart(2,'0');
   const found = PLAN_SHEET_NAMES.indexOf(currentKW);
   planCurrentIdx = found >= 0 ? found : PLAN_SHEET_NAMES.length - 1;
@@ -1342,30 +1406,56 @@ function loadPlanSheet(idx) {
   planCurrentIdx = idx;
   const sheetName = PLAN_SHEET_NAMES[idx];
   const gid = PLAN_GID_MAP[sheetName];
-  const url = PLAN_URL_DEFAULT + (gid ? '#gid=' + gid : '');
+
+  // Validare GID: trebuie sa fie numeric si nenul
+  const validGid = gid && /^\d+$/.test(String(gid)) && String(gid) !== '0'
+    ? String(gid) : null;
+
+  const url = validGid
+    ? PLAN_URL_DEFAULT + '?gid=' + validGid + '&single=true&widget=true&headers=false'
+    : null;
 
   const wrap = document.getElementById('planWrap');
-  // Pastreaza sagetile in DOM, inlocuieste doar iframe-ul
-  const prev = document.getElementById('planBtnPrev');
-  const next = document.getElementById('planBtnNext');
-  // Sterge iframe-ul vechi daca exista
-  const old = wrap.querySelector('iframe');
+  // Sterge continut vechi
+  const old = wrap.querySelector('iframe, #planPh, .plan-no-gid');
   if (old) old.remove();
-  const ph = wrap.querySelector('#planPh');
-  if (ph) ph.remove();
+  const old2 = wrap.querySelector('iframe, #planPh, .plan-no-gid');
+  if (old2) old2.remove();
 
-  const iframe = document.createElement('iframe');
-  iframe.src = url;
-  iframe.style.cssText = 'width:100%;height:520px;border:none;display:block;';
-  iframe.allowFullscreen = true;
-  // Insereaza iframeul in wrap (sagetile sunt acum in header, nu in wrap)
-  wrap.appendChild(iframe);
+  if (url) {
+    const iframe = document.createElement('iframe');
+    iframe.src = url;
+    iframe.style.cssText = 'width:100%;height:520px;border:none;display:block;';
+    iframe.allowFullscreen = true;
+    wrap.appendChild(iframe);
+  } else {
+    // GID necunoscut — afisam mesaj si incercam re-sync
+    const msg = document.createElement('div');
+    msg.className = 'plan-no-gid frame-ph';
+    msg.style.cssText = 'min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;';
+    msg.innerHTML = `
+      <div style="font-size:2rem;">📋</div>
+      <p style="text-align:center;color:var(--text);opacity:.8;">
+        Sheet-ul <strong>${sheetName}</strong> a fost găsit,<br>
+        dar GID-ul nu este disponibil încă.
+      </p>
+      <button onclick="syncAll().then(()=>renderPlan())"
+        style="padding:10px 20px;background:var(--accent);color:#000;border:none;
+               border-radius:8px;font-weight:700;cursor:pointer;font-size:.9rem;">
+        🔄 Reîncarcă date din GAS
+      </button>
+    `;
+    wrap.appendChild(msg);
+    console.warn('[Plan] GID lipsă pentru', sheetName, '— valoare în map:', gid);
+  }
 
   // Sync dropdown
   const sel = document.getElementById('planSelect');
   if (sel) sel.value = sheetName;
 
   // Vizibilitate sageti
+  const prev = document.getElementById('planBtnPrev');
+  const next = document.getElementById('planBtnNext');
   if (prev) { prev.style.opacity = idx === 0 ? '0.25' : '1'; }
   if (next) { next.style.opacity = idx === PLAN_SHEET_NAMES.length - 1 ? '0.25' : '1'; }
 }
