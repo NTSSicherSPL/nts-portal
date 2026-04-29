@@ -624,27 +624,22 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
 
   <!-- ── PAGE 1: PLAN SĂPTĂMÂNAL ── -->
   <div class="page" id="p1">
-
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-      <button id="planBtnPrev" onclick="planNav(-1)" style="flex-shrink:0;width:42px;height:42px;background:var(--card);border:1px solid var(--b2);border-radius:10px;color:var(--accent);font-size:1.7rem;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:opacity .2s;">&#8249;</button>
-      <select id="planSelect" onchange="planSelectSheet(this.value)" style="flex:1;height:42px;font-size:.95rem;font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:.06em;background:var(--card);border:1px solid var(--b2);border-radius:10px;color:var(--text);cursor:pointer;padding:0 12px;">
-        <option value="">📅  Se încarcă...</option>
+      <button id="planBtnPrev" onclick="planNav(-1)" style="flex-shrink:0;width:42px;height:42px;background:var(--card);border:1px solid var(--b2);border-radius:10px;color:var(--accent);font-size:1.7rem;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;">&#8249;</button>
+      <select id="planSelect" onchange="planSelectSheet(this.value)" style="flex:1;height:42px;font-size:.95rem;font-family:'Rajdhani',sans-serif;font-weight:700;background:var(--card);border:1px solid var(--b2);border-radius:10px;color:var(--text);padding:0 12px;cursor:pointer;">
+        <option value="">📅 Se încarcă...</option>
       </select>
-      <button id="planBtnNext" onclick="planNav(1)" style="flex-shrink:0;width:42px;height:42px;background:var(--card);border:1px solid var(--b2);border-radius:10px;color:var(--accent);font-size:1.7rem;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:opacity .2s;">&#8250;</button>
-      <button onclick="planForceReload()" title="Actualizează" style="flex-shrink:0;width:42px;height:42px;background:rgba(0,170,255,.08);border:1px solid var(--b2);border-radius:10px;color:var(--accent);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">🔄</button>
+      <button id="planBtnNext" onclick="planNav(1)" style="flex-shrink:0;width:42px;height:42px;background:var(--card);border:1px solid var(--b2);border-radius:10px;color:var(--accent);font-size:1.7rem;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;">&#8250;</button>
+      <button onclick="planReload()" style="flex-shrink:0;width:42px;height:42px;background:rgba(0,170,255,.1);border:1px solid var(--b2);border-radius:10px;color:var(--accent);font-size:1.1rem;display:flex;align-items:center;justify-content:center;cursor:pointer;" title="Actualizează">🔄</button>
     </div>
-
-    <div style="border-radius:var(--r);overflow:hidden;border:1px solid var(--b);" id="planWrap">
+    <div style="border-radius:var(--r);overflow:hidden;border:1px solid var(--b);background:var(--card);" id="planWrap">
       <div class="frame-ph" id="planPh" style="min-height:220px;">
-        <div class="bi">📊</div>
-        <p>Se încarcă planul săptămânal…</p>
+        <div class="bi">📊</div><p>Se încarcă planul...</p>
       </div>
     </div>
-
   </div>
 
-
-  <!-- ── PAGE 2: SOLICITĂRI ── -->
+    <!-- ── PAGE 2: SOLICITĂRI ── -->
   <div class="page" id="p2">
     <div class="info-box">
       Completează formularul — solicitarea va fi trimisă direct pe email la echipa NTS.
@@ -856,23 +851,40 @@ async function syncAll(silent=false) {
     const res = await apiCall('GET', { action:'getData' });
     if(res && res.ok) {
       gData = res.data;
-      console.log('[NTS] certificari din Sheets:', JSON.stringify(gData.certificari));
-      // Pastreaza PLAN_URL_DEFAULT daca GSheets nu are un plan_url setat
       if (!gData.plan_url) gData.plan_url = PLAN_URL_DEFAULT;
-      // Push rapoartele locale nesincronizate dacă există
+
+      // Verifică dacă planSheets conține GID-uri reale (KWxx cu GID numeric)
+      const hasValidSheets = (gData.planSheets||[]).some(s =>
+        /^KW\d{2}$/i.test(s.name||'') && /^\d+$/.test(String(s.gid||s.sheetId||''))
+      );
+      if (!hasValidSheets) {
+        // planSheets gol sau cu debug — încearcă getSheetList separat
+        console.log('[Plan] planSheets fără GID-uri valide, încerc getSheetList...');
+        try {
+          const r2 = await apiCall('GET', { action:'getSheetList' });
+          if (r2 && r2.ok && Array.isArray(r2.sheets) && r2.sheets.length) {
+            gData.planSheets = r2.sheets;
+            console.log('[Plan] getSheetList OK:', JSON.stringify(r2.sheets));
+          } else {
+            console.warn('[Plan] getSheetList răspuns invalid:', JSON.stringify(r2));
+          }
+        } catch(e2) { console.warn('[Plan] getSheetList eroare:', e2.message); }
+      } else {
+        console.log('[Plan] planSheets OK din getData:', JSON.stringify(gData.planSheets));
+      }
+
+      // Push rapoarte locale nesincronizate
       const local = JSON.parse(localStorage.getItem('nts_local_q')||'[]');
       if(local.length) {
-        for(const r of local) {
-          await apiCall('POST', { action:'addRaport', ...r });
-        }
+        for(const r of local) { await apiCall('POST', { action:'addRaport', ...r }); }
         localStorage.removeItem('nts_local_q');
-        // Re-fetch
         const res2 = await apiCall('GET', { action:'getData' });
-        if(res2 && res2.ok) gData = res2.data;
+        if(res2 && res2.ok) { gData = res2.data; if(!gData.plan_url) gData.plan_url = PLAN_URL_DEFAULT; }
       }
+
       buildMonths();
       renderP();
-      applyPlanSheetsFromGas();  // aplică GID-urile KW19, KW20... din GAS
+      applyGasSheets();
       await renderPlan();
       renderCert();
       setSyncState('ok', 'Sincronizat');
@@ -887,7 +899,6 @@ async function syncAll(silent=false) {
     loader(false);
   }
 }
-
 async function refreshConexiune() {
   const btn = document.getElementById('refreshBtn');
   const icon = document.getElementById('refreshIcon');
@@ -1251,18 +1262,17 @@ function resetReqForm() {
     {weekday:'long', day:'numeric', month:'long', year:'numeric'});
   removeImg();
 }
-// ╔══════════════════════════════════════════════════════════╗
-// ║  PAGE 1 — PLAN SĂPTĂMÂNAL                               ║
-// ║  Sursa GID-uri: Google Sheets JSON feed (fără auth)     ║
-// ║  Actualizare automată live — fără GID hardcodat         ║
-// ╚══════════════════════════════════════════════════════════╝
 
-// ID-ul spreadsheet-ului "PLAN NTS Field 2026"
-const PLAN_SS_ID    = '1VfP_SvzaJBUu4BVLmsxTL-s6vrmDXogueBYSCrg0rAs';
-const PLAN_PUBHTML  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRLEHiuD5sC3CtFx_vlHt9Cdg0q-XmmyQekp2-AUoysdUqVSMAFAzf8Xo4k337GYw/pubhtml';
-const PLAN_URL_DEFAULT = PLAN_PUBHTML; // alias pentru compatibilitate
+// ╔══════════════════════════════════════════╗
+// ║  PAGE 1 — PLAN SĂPTĂMÂNAL               ║
+// ╚══════════════════════════════════════════╝
 
-// GID-uri cunoscute KW03-KW18 (fallback dacă feed-ul e indisponibil)
+// URL pubhtml — SINGURUL URL care funcționează (spreadsheet publicat)
+const PLAN_PUBHTML     = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRLEHiuD5sC3CtFx_vlHt9Cdg0q-XmmyQekp2-AUoysdUqVSMAFAzf8Xo4k337GYw/pubhtml';
+const PLAN_URL_DEFAULT = PLAN_PUBHTML;
+
+// GID-uri cunoscute KW03–KW18
+// KW19, KW20, KW21... vin automat din GAS la fiecare syncAll()
 const PLAN_GID_MAP = {
   KW03:'1014315902', KW04:'1856886874', KW05:'108324973',  KW06:'763291193',
   KW07:'91102157',   KW08:'1688520736', KW09:'84537899',   KW10:'1302325059',
@@ -1272,9 +1282,7 @@ const PLAN_GID_MAP = {
 
 let PLAN_SHEET_NAMES = [];
 let planCurrentIdx   = 0;
-let planFeedLoaded   = false;
 
-// ── Calcul săptămână ISO ──────────────────────────────────────────
 function getISOWeek(d) {
   const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   dt.setUTCDate(dt.getUTCDate() + 4 - (dt.getUTCDay() || 7));
@@ -1282,147 +1290,114 @@ function getISOWeek(d) {
   return Math.ceil((((dt - y0) / 86400000) + 1) / 7);
 }
 
-// ── Fetch GID-uri din Google Sheets JSON feed (public, fără auth) ─
-// URL: spreadsheets/d/{ID}/feeds/worksheets/default/public/basic?alt=json
-// Returnează lista tuturor sheet-urilor cu titlu și ID (=GID)
-async function fetchGidsFromFeed() {
-  const feedUrl =
-    'https://spreadsheets.google.com/feeds/worksheets/' +
-    PLAN_SS_ID + '/public/basic?alt=json';
-  try {
-    const r = await fetch(feedUrl, { cache: 'no-store' });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const json = await r.json();
-    const entries = json.feed?.entry || [];
-    let found = 0;
-    entries.forEach(e => {
-      const title = (e.title?.$t || '').toUpperCase().trim();
-      // GID-ul e la finalul link-ului self: .../worksheets/{ID}/...
-      const selfLink = (e.link || []).find(l => l.rel === 'self');
-      const gid = selfLink ? selfLink.href.split('/').pop() : '';
-      if (/^KW\d{2}$/.test(title) && gid && gid !== '0') {
-        PLAN_GID_MAP[title] = gid;
-        found++;
-      }
-    });
-    if (found > 0) {
-      planFeedLoaded = true;
-      console.log('[Plan] Feed OK —', found, 'sheet-uri:', JSON.stringify(PLAN_GID_MAP));
-    }
-    return found;
-  } catch(e) {
-    console.warn('[Plan] Feed indisponibil:', e.message, '— se folosesc GID-urile din GAS/fallback');
-    return 0;
-  }
-}
-
-// ── Aplică planSheets venite din GAS getData() ───────────────────
-function applyPlanSheetsFromGas() {
+// Aplică GID-urile din GAS — apelat după orice getData()
+function applyGasSheets() {
   if (!gData.planSheets || !gData.planSheets.length) return;
+  let n = 0;
   gData.planSheets.forEach(s => {
     const name = (s.name || '').toUpperCase().trim();
-    const gid  = String(s.gid || s.sheetId || '').replace(/\D/g, '');
+    const gid  = String(s.gid || s.sheetId || s.id || '').replace(/\D/g, '');
     if (/^KW\d{2}$/.test(name) && gid && gid !== '0') {
       PLAN_GID_MAP[name] = gid;
+      n++;
     }
   });
+  if (n) console.log('[Plan] GID-uri din GAS aplicați:', n, JSON.stringify(PLAN_GID_MAP));
+  else    console.warn('[Plan] planSheets gol sau fără GID-uri valide:', JSON.stringify(gData.planSheets));
 }
 
-// ── Construiește URL iframe cu cache-bust ─────────────────────────
-function buildPlanUrl(gid) {
-  // Cache-bust la fiecare minut → modificările apar automat
-  const v = Math.floor(Date.now() / 60000);
-  return PLAN_PUBHTML + '?gid=' + gid +
-         '&single=true&widget=true&headers=false&rm=minimal&_v=' + v;
+// Construiește URL iframe cu pubhtml + gid + cache-bust
+// pubhtml?gid=X&single=true funcționează întotdeauna dacă fișierul e publicat
+function buildUrl(gid) {
+  const v = Math.floor(Date.now() / 60000); // cache-bust la fiecare minut
+  return PLAN_PUBHTML + '?gid=' + gid + '&single=true&widget=true&headers=false&_v=' + v;
 }
 
-// ── Render principal ──────────────────────────────────────────────
 async function renderPlan() {
-  // 1. Aplică GID-urile din GAS (KW19, KW20...)
-  applyPlanSheetsFromGas();
+  // Pasul 1: aplică GID-urile din GAS
+  applyGasSheets();
 
-  // 2. Fetch GID-uri din feed Google (o singură dată pe sesiune)
-  if (!planFeedLoaded) {
-    await fetchGidsFromFeed();
-  }
-
-  // 3. Construiește lista completă sortată
+  // Pasul 2: construiește lista completă
   const kwCur   = getISOWeek(new Date());
   const curName = 'KW' + String(kwCur).padStart(2, '0');
-  const allNames = [...new Set([
+  const all = [...new Set([
     ...Object.keys(PLAN_GID_MAP).filter(k => /^KW\d{2}$/.test(k)),
-    curName   // săptămâna curentă garantat prezentă
+    curName
   ])].sort();
-  PLAN_SHEET_NAMES = allNames;
+  PLAN_SHEET_NAMES = all;
 
-  // 4. Rebuild dropdown
+  // Pasul 3: dropdown
   const sel = document.getElementById('planSelect');
   if (sel) {
-    sel.innerHTML = allNames.map(n => {
+    sel.innerHTML = all.map(n => {
       const hasGid = !!PLAN_GID_MAP[n];
-      const num    = parseInt(n.replace('KW', ''));
-      const isCur  = num === kwCur;
-      const label  = `📅  Săptămâna ${n.replace('KW', '')}${isCur ? ' ✦' : ''}`;
-      return `<option value="${n}" ${!hasGid ? 'style="opacity:.55"' : ''}>${label}</option>`;
+      const isCur  = parseInt(n.replace('KW','')) === kwCur;
+      return `<option value="${n}" ${!hasGid?'style="opacity:.5"':''}>`
+           + `📅  Săptămâna ${n.replace('KW','')}${isCur?' ✦':''}</option>`;
     }).join('');
   }
 
-  // 5. Auto-selectează săptămâna curentă
-  const found = PLAN_SHEET_NAMES.indexOf(curName);
-  planCurrentIdx = found >= 0 ? found : PLAN_SHEET_NAMES.length - 1;
+  // Pasul 4: selectează KW curent
+  const idx = PLAN_SHEET_NAMES.indexOf(curName);
+  planCurrentIdx = idx >= 0 ? idx : PLAN_SHEET_NAMES.length - 1;
   if (sel) sel.value = PLAN_SHEET_NAMES[planCurrentIdx];
 
   loadPlanSheet(planCurrentIdx);
 }
 
-// ── Încarcă un sheet în iframe ────────────────────────────────────
 function loadPlanSheet(idx) {
   if (idx < 0 || idx >= PLAN_SHEET_NAMES.length) return;
   planCurrentIdx  = idx;
-  const sheetName = PLAN_SHEET_NAMES[idx];
-  const gid       = PLAN_GID_MAP[sheetName];
-  const validGid  = gid && /^\d+$/.test(gid) && gid !== '0' ? gid : null;
+  const name      = PLAN_SHEET_NAMES[idx];
+  const gid       = PLAN_GID_MAP[name];
+  const validGid  = gid && /^\d+$/.test(gid) ? gid : null;
 
   const wrap = document.getElementById('planWrap');
   while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
 
   if (validGid) {
     const iframe = document.createElement('iframe');
-    iframe.src = buildPlanUrl(validGid);
-    iframe.style.cssText = 'width:100%;height:560px;border:none;display:block;background:#fff;';
+    iframe.src = buildUrl(validGid);
+    iframe.style.cssText = 'width:100%;height:570px;border:none;display:block;background:#fff;';
     iframe.allowFullscreen = true;
     wrap.appendChild(iframe);
   } else {
-    // GID lipsă — încearcă re-fetch feed și re-render
-    const msg = document.createElement('div');
-    msg.className = 'frame-ph';
-    msg.style.minHeight = '220px';
-    msg.innerHTML = `
-      <div style="font-size:2rem">📋</div>
-      <p style="text-align:center;font-size:.85rem;color:var(--dim);line-height:1.6">
-        GID-ul pentru <strong style="color:var(--accent)">${sheetName}</strong> nu a fost găsit.<br>
-        Apasă 🔄 pentru a reîncărca.
-      </p>
-      <button onclick="planForceReload()" style="
-        margin-top:8px;padding:10px 22px;background:var(--accent);color:#000;
-        border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:.9rem;">
-        🔄 Reîncarcă
-      </button>`;
-    wrap.appendChild(msg);
+    // GID lipsă — afișăm mesaj clar
+    wrap.innerHTML = `
+      <div class="frame-ph" style="min-height:240px;">
+        <div class="bi">📋</div>
+        <p style="text-align:center;line-height:1.7;max-width:280px;">
+          <strong style="color:var(--accent)">${name}</strong> există, dar GID-ul nu a venit din GAS.<br>
+          <span style="font-size:.75rem;color:var(--dim);">
+            Verifică în GAS că fișierul PLAN NTS Field are acces corect,<br>
+            apoi apasă 🔄 Sync.
+          </span>
+        </p>
+        <button onclick="syncAll().then(()=>renderPlan())" style="
+          padding:10px 22px;background:var(--accent);color:#000;border:none;
+          border-radius:8px;font-weight:700;cursor:pointer;font-size:.9rem;margin-top:4px;">
+          🔄 Sync &amp; Reîncarcă
+        </button>
+      </div>`;
+    console.error('[Plan] GID lipsă pentru', name,
+      '\nplanSheets GAS:', JSON.stringify(gData.planSheets),
+      '\nPLAN_GID_MAP:', JSON.stringify(PLAN_GID_MAP));
   }
 
-  // Sync dropdown și săgeți
   const sel  = document.getElementById('planSelect');
-  if (sel) sel.value = sheetName;
+  if (sel) sel.value = name;
   const prev = document.getElementById('planBtnPrev');
   const next = document.getElementById('planBtnNext');
   if (prev) prev.style.opacity = idx === 0 ? '0.25' : '1';
-  if (next) next.style.opacity = idx === PLAN_SHEET_NAMES.length - 1 ? '0.25' : '1';
+  if (next) next.style.opacity = idx === PLAN_SHEET_NAMES.length-1 ? '0.25' : '1';
 }
 
-// ── Reload forțat (butonul 🔄) ────────────────────────────────────
-async function planForceReload() {
-  planFeedLoaded = false;
+async function planReload() {
+  // Re-sync cu GAS ca să obținem GID-urile noi
+  await syncAll(true);
+  applyGasSheets();
+  // Forțează rebuild iframe cu cache-bust nou
+  PLAN_SHEET_NAMES = [];
   await renderPlan();
   toast('🔄 Plan actualizat!');
 }
@@ -1431,15 +1406,11 @@ function planNav(dir) {
   const i = planCurrentIdx + dir;
   if (i >= 0 && i < PLAN_SHEET_NAMES.length) loadPlanSheet(i);
 }
-
 function planSelectSheet(name) {
   const i = PLAN_SHEET_NAMES.indexOf(name);
   if (i >= 0) loadPlanSheet(i);
 }
-
-// ── Dummy-uri compatibilitate ─────────────────────────────────────
-async function autoDiscoverGids() { await fetchGidsFromFeed(); }
-
+async function autoDiscoverGids() { applyGasSheets(); }
 
 // ╔══════════════════════════════════════════╗
 // ║  PONTAJ                         ║
