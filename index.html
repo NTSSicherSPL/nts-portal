@@ -1593,14 +1593,14 @@ function renderP() {
 
   // Zile lucrate = nr total rapoarte (intrări)
   const totalDays = data.length;
-  // Site-uri = nr total rapoarte cu site valid (fiecare raport = 1 site lucrat)
-  const totalSites = data.filter(r => {
-    const s = String(r.nrSite == null ? '' : r.nrSite).trim();
-    return s && s !== '—';
-  }).length;
+  // Site-uri = nr site-uri UNICE (non-empty, non-dash) — același site lucrat de 2x = 1 site
+  const uniqueSites = new Set(
+    data.map(r => String(r.nrSite == null ? '' : r.nrSite).trim().toUpperCase())
+        .filter(s => s && s !== '—' && s !== '')
+  );
 
   document.getElementById('sDays').textContent  = totalDays;
-  document.getElementById('sSites').textContent = totalSites;
+  document.getElementById('sSites').textContent = uniqueSites.size;
 
   const tb = document.getElementById('ptbody');
   if (!data.length) {
