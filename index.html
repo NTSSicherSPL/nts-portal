@@ -625,42 +625,51 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
   <!-- ── PAGE 1: PLAN SĂPTĂMÂNAL ── -->
   <div class="page" id="p1">
 
-    <!-- Rând navigare: săgeată stânga · label KW · săgeată dreapta -->
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-
-      <button id="planBtnPrev" onclick="planNav(-1)" style="
-        flex-shrink:0;width:64px;height:64px;
-        background:var(--card);border:2px solid var(--b2);border-radius:12px;
-        color:var(--accent);font-size:2.6rem;line-height:1;
-        display:flex;align-items:center;justify-content:center;
-        cursor:pointer;-webkit-tap-highlight-color:transparent;
-        transition:border-color .2s,background .2s;">&#8249;</button>
-
-      <div id="planLabel" style="
-        flex:1;text-align:center;
-        font-family:'Rajdhani',sans-serif;font-size:1.15rem;font-weight:700;
-        letter-spacing:.1em;color:var(--accent);
-        background:var(--card);border:1px solid var(--b2);border-radius:10px;
-        padding:0 10px;height:64px;display:flex;align-items:center;justify-content:center;">
-        📅 Se încarcă...
-      </div>
-
-      <button id="planBtnNext" onclick="planNav(1)" style="
-        flex-shrink:0;width:64px;height:64px;
-        background:var(--card);border:2px solid var(--b2);border-radius:12px;
-        color:var(--accent);font-size:2.6rem;line-height:1;
-        display:flex;align-items:center;justify-content:center;
-        cursor:pointer;-webkit-tap-highlight-color:transparent;
-        transition:border-color .2s,background .2s;">&#8250;</button>
-
+    <!-- Label săptămână curentă -->
+    <div style="display:flex;align-items:center;justify-content:center;margin-bottom:8px;">
+      <select id="planSelect" onchange="planSelectSheet(this.value)" style="
+        height:46px;font-size:1rem;font-family:'Rajdhani',sans-serif;
+        font-weight:700;letter-spacing:.06em;text-align:center;
+        background:var(--card);border:1px solid var(--b2);
+        border-radius:10px;color:var(--text);cursor:pointer;
+        padding:0 14px;max-width:260px;width:100%;">
+        <option value="">📅  Se încarcă...</option>
+      </select>
     </div>
 
-    <!-- Iframe plan -->
-    <div style="border-radius:var(--r);overflow:hidden;border:1px solid var(--b);" id="planWrap">
+    <!-- Plan iframe + săgeți overlay mari -->
+    <div style="position:relative;border-radius:var(--r);overflow:hidden;border:1px solid var(--b);" id="planWrap">
+
+      <!-- Conținut iframe -->
       <div class="frame-ph" id="planPh" style="min-height:220px;">
         <div class="bi">📊</div>
         <p>Se încarcă planul săptămânal din Google Sheets…</p>
       </div>
+
+      <!-- Săgeată STÂNGA — overlay mare -->
+      <button id="planBtnPrev" onclick="planNav(-1)" style="
+        position:absolute;left:0;top:0;bottom:0;
+        width:54px;
+        background:linear-gradient(90deg,rgba(10,22,40,.82) 0%,transparent 100%);
+        border:none;border-right:1px solid rgba(0,170,255,.12);
+        color:var(--accent);font-size:2.4rem;line-height:1;
+        display:flex;align-items:center;justify-content:center;
+        cursor:pointer;z-index:10;
+        -webkit-tap-highlight-color:transparent;
+        transition:background .2s;">&#8249;</button>
+
+      <!-- Săgeată DREAPTA — overlay mare -->
+      <button id="planBtnNext" onclick="planNav(1)" style="
+        position:absolute;right:0;top:0;bottom:0;
+        width:54px;
+        background:linear-gradient(270deg,rgba(10,22,40,.82) 0%,transparent 100%);
+        border:none;border-left:1px solid rgba(0,170,255,.12);
+        color:var(--accent);font-size:2.4rem;line-height:1;
+        display:flex;align-items:center;justify-content:center;
+        cursor:pointer;z-index:10;
+        -webkit-tap-highlight-color:transparent;
+        transition:background .2s;">&#8250;</button>
+
     </div>
 
   </div>
@@ -1277,15 +1286,11 @@ function resetReqForm() {
 const PLAN_URL_DEFAULT = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRLEHiuD5sC3CtFx_vlHt9Cdg0q-XmmyQekp2-AUoysdUqVSMAFAzf8Xo4k337GYw/pubhtml';
 
 // GID-uri cunoscute — extinse automat din gData.planSheets la fiecare sync
-// GID-uri cunoscute ca fallback (se actualizează automat din GAS la fiecare sync)
-// NU mai trebuie editat manual — GAS trimite automat foile noi (KW20, KW21, etc.)
-// Vezi fișierul NTS_GAS_planSheets_patch.gs pentru cum se configurează GAS.
 const PLAN_GID_MAP = {
   "KW03":"1014315902","KW04":"1856886874","KW05":"108324973","KW06":"763291193",
   "KW07":"91102157","KW08":"1688520736","KW09":"84537899","KW10":"1302325059",
   "KW11":"1975033641","KW12":"1061181002","KW13":"1331110351","KW14":"1818135625",
   "KW15":"939295662","KW16":"1581976862","KW17":"1779880058","KW18":"1194226"
-  // KW19, KW20, KW21... vin automat de la GAS după ce adaugi getPlanSheets() în getData()
 };
 
 let PLAN_SHEET_NAMES = [];
@@ -1299,24 +1304,33 @@ function getISOWeek(d) {
 }
 
 function renderPlan() {
-  // Adaugă/suprascrie GID-urile venite de la server (prioritate față de fallback)
-  // Când GAS are getPlanSheets(), orice foaie nouă KWxx apare automat aici
+  // 1. Adauga GID-uri noi primite de la server
   if (gData.planSheets && gData.planSheets.length > 0) {
     gData.planSheets
       .filter(s => /^KW\d{2}$/i.test(s.name))
       .forEach(s => { PLAN_GID_MAP[s.name.toUpperCase()] = String(s.gid); });
   }
 
-  // Construieste lista sortata din toate GID-urile cunoscute
-  PLAN_SHEET_NAMES = Object.keys(PLAN_GID_MAP)
+  // 2. Construieste lista DOAR din GID-uri cunoscute, sortata
+  const allNames = Object.keys(PLAN_GID_MAP)
     .filter(k => /^KW\d{2}$/.test(k))
     .sort();
+  PLAN_SHEET_NAMES = allNames;
 
-  // 3. Auto-selecteaza saptamana curenta (sau ultima disponibila)
+  // 3. Rebuildeaza dropdown
+  const sel = document.getElementById('planSelect');
+  if (sel) {
+    sel.innerHTML = allNames
+      .map(n => `<option value="${n}">📅  Săptămâna ${n.replace('KW','')}</option>`)
+      .join('');
+  }
+
+  // 4. Auto-selecteaza saptamana curenta (sau ultima disponibila)
   const currentKW = 'KW' + String(getISOWeek(new Date())).padStart(2,'0');
   const found = PLAN_SHEET_NAMES.indexOf(currentKW);
   planCurrentIdx = found >= 0 ? found : PLAN_SHEET_NAMES.length - 1;
 
+  if (sel) sel.value = PLAN_SHEET_NAMES[planCurrentIdx];
   loadPlanSheet(planCurrentIdx);
 }
 
@@ -1325,30 +1339,36 @@ function loadPlanSheet(idx) {
   planCurrentIdx = idx;
   const sheetName = PLAN_SHEET_NAMES[idx];
   const gid = PLAN_GID_MAP[sheetName];
+  const url = PLAN_URL_DEFAULT + (gid ? '#gid=' + gid : '');
 
-  // Actualizează label
-  const lbl = document.getElementById('planLabel');
-  if (lbl) lbl.textContent = '📅  Săptămâna ' + sheetName.replace('KW','');
-
-  // Actualizează vizibilitate săgeți
+  const wrap = document.getElementById('planWrap');
+  // Pastreaza sagetile in DOM, inlocuieste doar iframe-ul
   const prev = document.getElementById('planBtnPrev');
   const next = document.getElementById('planBtnNext');
-  if (prev) prev.style.opacity = idx === 0 ? '0.28' : '1';
-  if (next) next.style.opacity = idx === PLAN_SHEET_NAMES.length - 1 ? '0.28' : '1';
-
-  const url = PLAN_URL_DEFAULT + (gid ? '#gid=' + gid : '');
-  const wrap = document.getElementById('planWrap');
-
-  // Înlocuiește conținut
-  const oldPh = document.getElementById('planPh');
-  if (oldPh) oldPh.remove();
-  const oldIf = wrap.querySelector('iframe');
-  if (oldIf) oldIf.remove();
+  // Sterge iframe-ul vechi daca exista
+  const old = wrap.querySelector('iframe');
+  if (old) old.remove();
+  const ph = wrap.querySelector('#planPh');
+  if (ph) ph.remove();
 
   const iframe = document.createElement('iframe');
   iframe.src = url;
   iframe.style.cssText = 'width:100%;height:520px;border:none;display:block;';
-  wrap.appendChild(iframe);
+  iframe.allowFullscreen = true;
+  // Insereaza inainte de sageata dreapta (sau la sfarsit)
+  if (next && next.parentNode === wrap) {
+    wrap.insertBefore(iframe, next);
+  } else {
+    wrap.appendChild(iframe);
+  }
+
+  // Sync dropdown
+  const sel = document.getElementById('planSelect');
+  if (sel) sel.value = sheetName;
+
+  // Vizibilitate sageti
+  if (prev) { prev.style.opacity = idx === 0 ? '0.25' : '1'; }
+  if (next) { next.style.opacity = idx === PLAN_SHEET_NAMES.length - 1 ? '0.25' : '1'; }
 }
 
 function planNav(dir) {
@@ -1365,10 +1385,16 @@ function planSelectSheet(sheetName) {
 // ║  PONTAJ                         ║
 // ╚══════════════════════════════════════════╝
 
+function getDateStr(d){
+  if(!d)return'';
+  var m=String(d).match(/^(\d{4}-\d{2}-\d{2})/);
+  return m?m[1]:'';
+}
+
 function buildMonths() {
   const rapoarte = gData.rapoarte || [];
   const sel = document.getElementById('fMonth');
-  const months=[...new Set(rapoarte.map(r=>r.data?.slice(0,7)))].filter(Boolean).sort().reverse();
+  const months=[...new Set(rapoarte.map(r=>getDateStr(r.data).slice(0,7)))].filter(Boolean).sort().reverse();
   const cur=sel.value;
   sel.innerHTML='<option value="">Toate lunile</option>';
   months.forEach(m=>{
@@ -1416,16 +1442,17 @@ function renderP() {
   const tm = document.getElementById('fTeam').value;
 
   let data = rapoarte.filter(r => {
-    if (mf && !r.data?.startsWith(mf)) return false;
+    const ds = getDateStr(r.data);
+    if (mf && !ds.startsWith(mf)) return false;
     if (tf && !r.technicieni?.includes(tf)) return false;
     if (tm) {
       const members = TEAM_MEMBERS[tm] || [];
       if (!members.some(m => (r.technicieni||'').includes(m))) return false;
     }
     // Elimina inregistrarile de pe 26 aprilie
-    if ((r.data||'').includes('-04-26')) return false;
+    if (ds.includes('-04-26')) return false;
     return true;
-  }).sort((a,b) => (b.data||'').localeCompare(a.data||''));
+  }).sort((a,b) => (getDateStr(b.data)||'').localeCompare(getDateStr(a.data)||''));
 
   // Zile lucrate = suma tuturor rapoartelor (nr total intrări)
   const totalDays = data.length;
@@ -1453,7 +1480,17 @@ function renderP() {
     </tr>`;
   }).join('');
 }
-function fmtD(d){if(!d)return'—';try{return new Date(d+'T00:00:00').toLocaleDateString('ro-RO',{day:'2-digit',month:'2-digit',year:'2-digit'});}catch(e){return d;}}
+function fmtD(d){
+  if(!d)return'—';
+  try{
+    var ds=String(d).trim();
+    var m=ds.match(/^(\d{4}-\d{2}-\d{2})/);
+    if(m)ds=m[1];
+    var dt=new Date(ds+'T12:00:00');
+    if(isNaN(dt))return d;
+    return dt.toLocaleDateString('ro-RO',{day:'2-digit',month:'2-digit',year:'2-digit'});
+  }catch(e){return d;}
+}
 
 // ╔══════════════════════════════════════════╗
 // ║  PAGE 4 — CERTIFICĂRI                    ║
