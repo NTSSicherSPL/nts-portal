@@ -1289,15 +1289,15 @@ async function fetchPlanSheets() {
   return null;
 }
 
-// ── Fetch date foaie din GAS ──────────────────────────────────────
+// ── Fetch date + stiluri text din GAS ────────────────────────────
 async function fetchPlanData(sheetName) {
   const res = await apiCall('GET', { action: 'getPlanData', sheet: sheetName });
   if (!res || !res.ok) throw new Error(res?.error || 'GAS nu a returnat date');
-  return res.data; // array de array-uri (rows x cols)
+  return { rows: res.data, styles: res.styles || null };
 }
 
-// ── Render tabel din date GAS ─────────────────────────────────────
-function planDataToHtml(name, rows) {
+// ── Render tabel cu stiluri text din GAS (fără background) ───────
+function planDataToHtml(name, rows, styles) {
   if (!rows || rows.length < 2) {
     return `<div class="frame-ph" style="min-height:180px;">
       <div class="bi">📭</div>
@@ -1305,24 +1305,45 @@ function planDataToHtml(name, rows) {
   }
   const header = rows[0];
   const body   = rows.slice(1).filter(r => r.some(c => c !== '' && c !== null));
-  const kwCur  = getISOWeek(new Date());
-  const kwNum  = parseInt(name.replace('KW',''));
+  if (!body.length) return `<div class="frame-ph"><div class="bi">📭</div>
+    <p>Nicio înregistrare în ${name}.</p></div>`;
 
-  const thHtml = header.map(c =>
-    `<th style="padding:8px 10px;text-align:left;font-family:'Rajdhani',sans-serif;
-      font-size:.66rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase;
-      color:var(--accent);border-bottom:1px solid var(--b);white-space:nowrap;">${c||''}</th>`
-  ).join('');
+  const fws = styles?.fontWeights || null;  // bold / normal
+  const fss = styles?.fontStyles  || null;  // italic / normal
+  const fzs = styles?.fontSizes   || null;  // dimensiune font (pt)
 
+  // ── Header ────────────────────────────────────────────────────
+  const thHtml = header.map((col, ci) => {
+    const fw = fws?.[0]?.[ci] === 'bold' ? 'font-weight:900;' : 'font-weight:700;';
+    const fi = fss?.[0]?.[ci] === 'italic' ? 'font-style:italic;' : '';
+    return `<th style="padding:8px 10px;text-align:left;font-family:'Rajdhani',sans-serif;
+      font-size:.66rem;${fw}${fi}letter-spacing:.13em;text-transform:uppercase;
+      color:var(--accent);border-bottom:1px solid var(--b);white-space:nowrap;">${col ?? ''}</th>`;
+  }).join('');
+
+  // ── Body ──────────────────────────────────────────────────────
   const tbHtml = body.map((row, ri) => {
-    const tds = row.map(val => {
+    const gi  = ri + 1; // offset header în arrays GAS
+    const tds = row.map((val, ci) => {
       const s  = String(val ?? '').trim();
       const lo = s.toLowerCase();
-      let style = 'padding:8px 10px;border-bottom:1px solid rgba(26,48,80,.4);vertical-align:top;';
-      if (lo==='finalizat'||lo==='da'||lo==='yes') style += 'color:var(--green);font-weight:600;';
-      else if (lo==='nefinalizat'||lo==='nu'||lo==='no') style += 'color:var(--red);font-weight:600;';
-      else if (/^[A-Z]{2}\d{3,}/.test(s)||/^\d{7,}$/.test(s)) style += 'color:var(--gold);font-weight:600;';
-      return `<td style="${style}">${s||'—'}</td>`;
+
+      // Stil text din GAS
+      const fw  = fws?.[gi]?.[ci] === 'bold'   ? 'font-weight:700;' : '';
+      const fi  = fss?.[gi]?.[ci] === 'italic' ? 'font-style:italic;' : '';
+      // Dimensiune font: GAS returnează în pt (ex: 10, 11, 12) → convertim în rem
+      const fzRaw = fzs?.[gi]?.[ci];
+      const fz  = fzRaw && fzRaw > 0 ? `font-size:${(fzRaw / 11).toFixed(2)}rem;` : '';
+
+      // Culoare semantică portală (neschimbată)
+      let color = 'color:var(--text);';
+      if      (lo==='finalizat'||lo==='da'||lo==='yes') color = 'color:var(--green);font-weight:600;';
+      else if (lo==='nefinalizat'||lo==='nu'||lo==='no') color = 'color:var(--red);font-weight:600;';
+      else if (/^[A-Z]{2}\d{3,}/.test(s)||/^\d{7,}$/.test(s)) color = 'color:var(--gold);font-weight:600;';
+
+      const st = `padding:8px 10px;border-bottom:1px solid rgba(26,48,80,.4);
+        vertical-align:top;${color}${fw}${fi}${fz}`;
+      return `<td style="${st}">${s || '—'}</td>`;
     }).join('');
     const bg = ri%2!==0 ? 'background:rgba(0,170,255,.02);' : '';
     return `<tr style="${bg}">${tds}</tr>`;
@@ -1413,8 +1434,8 @@ async function loadPlanSheet(idx) {
     <p style="font-size:.82rem;">Se încarcă <strong style="color:var(--accent)">${name}</strong>...</p></div>`;
 
   try {
-    const rows = await fetchPlanData(name);
-    const html = planDataToHtml(name, rows);
+    const { rows, styles } = await fetchPlanData(name);
+    const html = planDataToHtml(name, rows, styles);
     if (wrap) wrap.innerHTML = html;
     const ora  = new Date().toLocaleTimeString('ro-RO',{hour:'2-digit',minute:'2-digit'});
     const nRows = rows ? Math.max(0, rows.length - 1) : 0;
