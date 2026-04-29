@@ -1034,7 +1034,7 @@ async function submitRep() {
   const pl={
     action:       'addRaport',
     timestamp:    new Date().toISOString(),
-    data:         (dt ? dt + 'T12:00:00' : dt),
+    data:         dt,
     contractor:   ctr,
     technicieni:  [...selTechs].join(', '),
     nrSite:       siteNum || '—',
@@ -1503,8 +1503,15 @@ function planSelectSheet(name) {
 // ╚══════════════════════════════════════════╝
 
 function getDateStr(d){
-  if(!d)return'';
+  if(d===null||d===undefined||d==='')return'';
+  // Date object (poate veni din GSheets sau new Date())
+  if(d instanceof Date){
+    if(isNaN(d))return'';
+    var y=d.getFullYear(),mo=String(d.getMonth()+1).padStart(2,'0'),dy=String(d.getDate()).padStart(2,'0');
+    return y+'-'+mo+'-'+dy;
+  }
   var s=String(d).trim();
+  if(!s)return'';
   // Format romanesc dd.mm.yyyy sau dd.mm.yy
   var ro=s.match(/^(\d{2})\.(\d{2})\.(\d{2,4})$/);
   if(ro){
@@ -1515,7 +1522,7 @@ function getDateStr(d){
   if(s.match(/^\d{4}-\d{2}-\d{2}T/)){
     var dt=new Date(s);
     if(!isNaN(dt)){
-      var y=dt.getFullYear(), mo=String(dt.getMonth()+1).padStart(2,'0'), dy=String(dt.getDate()).padStart(2,'0');
+      var y=dt.getFullYear(),mo=String(dt.getMonth()+1).padStart(2,'0'),dy=String(dt.getDate()).padStart(2,'0');
       return y+'-'+mo+'-'+dy;
     }
   }
@@ -1588,7 +1595,7 @@ function renderP() {
   const totalDays = data.length;
   // Site-uri = nr total rapoarte cu site valid (fiecare raport = 1 site lucrat)
   const totalSites = data.filter(r => {
-    const s = (r.nrSite||'').trim();
+    const s = String(r.nrSite == null ? '' : r.nrSite).trim();
     return s && s !== '—';
   }).length;
 
@@ -1605,16 +1612,22 @@ function renderP() {
     return `<tr>
       <td style="white-space:nowrap">${fmtD(r.data)}</td>
       <td>${team}</td>
-      <td style="font-weight:600;color:var(--gold)">${r.nrSite||'—'}</td>
-      <td>${r.tipLucrare||'—'}</td>
-      <td><span class="bdg ${r.status==='Finalizat'?'fin':'nef'}">${r.status||'—'}</span></td>
+      <td style="font-weight:600;color:var(--gold)">${String(r.nrSite??'')||'—'}</td>
+      <td>${String(r.tipLucrare??'')||'—'}</td>
+      <td><span class="bdg ${String(r.status||'')==='Finalizat'?'fin':'nef'}">${String(r.status||'')||'—'}</span></td>
     </tr>`;
   }).join('');
 }
 function fmtD(d){
-  if(!d)return'—';
+  if(d===null||d===undefined||d==='')return'—';
   try{
+    // Date object direct (poate veni din GSheets ca obiect Date)
+    if(d instanceof Date){
+      if(isNaN(d))return'—';
+      return d.toLocaleDateString('ro-RO',{day:'2-digit',month:'2-digit',year:'2-digit'});
+    }
     var ds=String(d).trim();
+    if(!ds)return'—';
     // Format romanesc dd.mm.yyyy sau dd.mm.yy
     var ro=ds.match(/^(\d{2})\.(\d{2})\.(\d{2,4})$/);
     if(ro){
@@ -1630,9 +1643,9 @@ function fmtD(d){
     var m=ds.match(/^(\d{4}-\d{2}-\d{2})/);
     if(m)ds=m[1];
     var dt=new Date(ds+'T12:00:00');
-    if(isNaN(dt))return d;
+    if(isNaN(dt))return String(d);
     return dt.toLocaleDateString('ro-RO',{day:'2-digit',month:'2-digit',year:'2-digit'});
-  }catch(e){return d;}
+  }catch(e){return String(d);}
 }
 
 // ╔══════════════════════════════════════════╗
