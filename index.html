@@ -1395,6 +1395,14 @@ function getDateStr(d){
     var yr=ro[3].length===2?'20'+ro[3]:ro[3];
     return yr+'-'+ro[2]+'-'+ro[1];
   }
+  // ISO datetime complet (ex: "2026-04-28T22:00:00.000Z") - parseaza ca Date pentru ora locala corecta
+  if(s.match(/^\d{4}-\d{2}-\d{2}T/)){
+    var dt=new Date(s);
+    if(!isNaN(dt)){
+      var y=dt.getFullYear(), mo=String(dt.getMonth()+1).padStart(2,'0'), dy=String(dt.getDate()).padStart(2,'0');
+      return y+'-'+mo+'-'+dy;
+    }
+  }
   var m=s.match(/^(\d{4}-\d{2}-\d{2})/);
   return m?m[1]:'';
 }
@@ -1498,6 +1506,11 @@ function fmtD(d){
       var yr=ro[3].length===2?'20'+ro[3]:ro[3];
       var dt2=new Date(yr+'-'+ro[2]+'-'+ro[1]+'T12:00:00');
       if(!isNaN(dt2))return dt2.toLocaleDateString('ro-RO',{day:'2-digit',month:'2-digit',year:'2-digit'});
+    }
+    // ISO datetime complet (ex: "2026-04-28T22:00:00.000Z") - parseaza ca Date pentru ora locala corecta
+    if(ds.match(/^\d{4}-\d{2}-\d{2}T/)){
+      var dtFull=new Date(ds);
+      if(!isNaN(dtFull))return dtFull.toLocaleDateString('ro-RO',{day:'2-digit',month:'2-digit',year:'2-digit'});
     }
     var m=ds.match(/^(\d{4}-\d{2}-\d{2})/);
     if(m)ds=m[1];
