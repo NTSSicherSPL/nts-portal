@@ -255,8 +255,8 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
 .sig-cancel:hover{border-color:var(--b2);color:var(--text);}
 
 /* ══ TOAST ══ */
-.toast{position:fixed;bottom:72px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--card);border:1px solid var(--green);border-radius:8px;padding:10px 18px;color:var(--green);font-family:'Rajdhani',sans-serif;font-size:.92rem;font-weight:600;letter-spacing:.04em;box-shadow:0 8px 26px rgba(0,0,0,.4);z-index:500;transition:transform .3s cubic-bezier(.17,.67,.4,1.2);white-space:nowrap;max-width:90vw;text-align:center;}
-.toast.show{transform:translateX(-50%) translateY(0);}
+.toast{position:fixed;bottom:72px;left:50%;transform:translateX(-50%) translateY(60px);opacity:0;background:var(--card);border:1px solid var(--green);border-radius:8px;padding:10px 18px;color:var(--green);font-family:'Rajdhani',sans-serif;font-size:.92rem;font-weight:600;letter-spacing:.04em;box-shadow:0 8px 26px rgba(0,0,0,.4);z-index:500;transition:transform .3s cubic-bezier(.17,.67,.4,1.2),opacity .3s;white-space:nowrap;max-width:90vw;text-align:center;}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
 .toast.err{border-color:var(--red);color:var(--red);}
 .toast.warn{border-color:var(--gold);color:var(--gold);}
 
@@ -1387,7 +1387,14 @@ function planSelectSheet(sheetName) {
 
 function getDateStr(d){
   if(!d)return'';
-  var m=String(d).match(/^(\d{4}-\d{2}-\d{2})/);
+  var s=String(d).trim();
+  // Format romanesc dd.mm.yyyy sau dd.mm.yy
+  var ro=s.match(/^(\d{2})\.(\d{2})\.(\d{2,4})$/);
+  if(ro){
+    var yr=ro[3].length===2?'20'+ro[3]:ro[3];
+    return yr+'-'+ro[2]+'-'+ro[1];
+  }
+  var m=s.match(/^(\d{4}-\d{2}-\d{2})/);
   return m?m[1]:'';
 }
 
@@ -1484,6 +1491,13 @@ function fmtD(d){
   if(!d)return'—';
   try{
     var ds=String(d).trim();
+    // Format romanesc dd.mm.yyyy sau dd.mm.yy
+    var ro=ds.match(/^(\d{2})\.(\d{2})\.(\d{2,4})$/);
+    if(ro){
+      var yr=ro[3].length===2?'20'+ro[3]:ro[3];
+      var dt2=new Date(yr+'-'+ro[2]+'-'+ro[1]+'T12:00:00');
+      if(!isNaN(dt2))return dt2.toLocaleDateString('ro-RO',{day:'2-digit',month:'2-digit',year:'2-digit'});
+    }
     var m=ds.match(/^(\d{4}-\d{2}-\d{2})/);
     if(m)ds=m[1];
     var dt=new Date(ds+'T12:00:00');
@@ -1574,11 +1588,13 @@ async function saveCert(ini) {
 // ╔══════════════════════════════════════════╗
 // ║  HELPERS                                 ║
 // ╚══════════════════════════════════════════╝
+let _toastTimer=null;
 function toast(msg, isErr=false, isWarn=false) {
   const t=document.getElementById('toast');
+  if(_toastTimer){clearTimeout(_toastTimer);_toastTimer=null;}
   t.textContent=msg;
   t.className='toast show'+(isErr?' err':isWarn?' warn':'');
-  setTimeout(()=>t.className='toast',3500);
+  _toastTimer=setTimeout(()=>{t.className='toast';_toastTimer=null;},3500);
 }
 function loader(on, txt='Se sincronizează...') {
   document.getElementById('lov').classList.toggle('on',on);
