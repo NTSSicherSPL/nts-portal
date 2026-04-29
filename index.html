@@ -833,7 +833,7 @@ function initApp() {
   document.getElementById('reportDate').value = now.toISOString().split('T')[0];
   buildTech(); buildPills(); buildMonths();
   syncAll(); injectMF();
-  setInterval(() => syncAll(true), 3 * 60 * 1000);
+  setInterval(() => syncAll(true), 90 * 1000); // 90 secunde
   setInterval(() => silentRecheck(), 30 * 60 * 1000);
 }
 
@@ -875,7 +875,11 @@ async function syncAll(silent=false) {
       }
       buildMonths();
       renderP();
-      applyGasSheets(); await renderPlan();
+      // planSheets vine deja din getData — aplica direct fara apel separat
+      if (gData.planSheets && gData.planSheets.length) {
+        PLAN_SHEET_NAMES = gData.planSheets.map(s => (s.name||s).toUpperCase()).filter(n => /^KW\d{2}$/i.test(n)).sort();
+      }
+      applyGasSheets();
       renderCert();
       setSyncState('ok', 'Sincronizat');
       if(!silent) toast('✔ Date sincronizate!');
@@ -914,28 +918,32 @@ function setSyncState(state, label) {
 
 // Google Apps Script: GET citeste, POST via GET param scrie (evita CORS redirect)
 async function apiCall(method, params) {
+  // AbortController cu timeout 15s — evita sa astepte indefinit
+  const ctrl = () => { const c = new AbortController(); setTimeout(() => c.abort(), 15000); return c; };
   if (method === 'GET') {
     const qs = new URLSearchParams(params).toString();
-    const r = await fetch(API_URL + '?' + qs, { method:'GET', redirect:'follow' });
+    const ac = ctrl();
+    const r = await fetch(API_URL + '?' + qs, { method:'GET', redirect:'follow', signal: ac.signal });
     if (!r.ok) throw new Error('Server HTTP ' + r.status);
     const txt = await r.text();
     if (!txt || !txt.trim()) throw new Error('Răspuns gol de la server');
     try {
       return JSON.parse(txt);
     } catch(e) {
-      // GAS a returnat HTML in loc de JSON (eroare de script)
       console.error('GAS raspuns non-JSON:', txt.slice(0,200));
       throw new Error('GAS Script Error — verifica deployment-ul');
     }
   } else {
     // Trimite payload ca param GET pentru a evita preflight CORS
     const payload = encodeURIComponent(JSON.stringify(params));
+    const ac = ctrl();
     try {
-      const r = await fetch(API_URL + '?payload=' + payload, { method:'GET', redirect:'follow' });
+      const r = await fetch(API_URL + '?payload=' + payload, { method:'GET', redirect:'follow', signal: ac.signal });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const txt = await r.text();
       return JSON.parse(txt);
     } catch(e) {
+      if (e.name === 'AbortError') throw new Error('Timeout — GAS nu a raspuns in 15s');
       // Fallback no-cors POST — datele ajung, raspunsul e opac
       await fetch(API_URL, {
         method:'POST', mode:'no-cors', redirect:'follow',
