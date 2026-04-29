@@ -848,9 +848,51 @@ function initApp() {
   const now = new Date();
   document.getElementById('reportDate').value = now.toISOString().split('T')[0];
   buildTech(); buildPills(); buildMonths();
+  applyUserPontajFilter();
   syncAll(); injectMF();
   setInterval(() => syncAll(true), 90 * 1000); // 90 secunde
   setInterval(() => silentRecheck(), 30 * 60 * 1000);
+}
+
+// Presetează filtrele de pontaj la echipa/tehnicianul logat
+function applyUserPontajFilter() {
+  if (!authUser || authUser.isAdmin) return; // Admin vede tot
+  const userName = (authUser.name || '').trim();
+  if (!userName) return;
+
+  // Normalizeaza numele: sorteaza cuvintele alfabetic pentru comparatie indiferent de ordine
+  // Ex: "Lungu Alexandru" === "Alexandru Lungu"
+  const normName = n => n.toLowerCase().trim().split(/\s+/).sort().join(' ');
+  const userNorm = normName(userName);
+
+  // Gaseste echipa si numele canonical al userului (din TEAM_MEMBERS)
+  let userTeam = null;
+  let canonicalName = null;
+  for (const [team, members] of Object.entries(TEAM_MEMBERS)) {
+    const match = members.find(m => normName(m) === userNorm);
+    if (match) { userTeam = team; canonicalName = match; break; }
+  }
+  if (!userTeam) return; // Nume negasit in echipe — nu restrictioneaza
+
+  // Seteaza filtrul Echipa
+  const fTeam = document.getElementById('fTeam');
+  if (fTeam) fTeam.value = userTeam;
+
+  // Seteaza filtrul Tehnician — foloseste numele canonical din TEAM_MEMBERS
+  const fTech = document.getElementById('fTech');
+  if (fTech) {
+    const opt = [...fTech.options].find(o => o.value === canonicalName);
+    if (opt) fTech.value = opt.value;
+  }
+
+  // Ascunde filtrele de echipa si tehnician — userul nu poate schimba
+  const fTeamWrap = fTeam?.closest('div');
+  const fTechWrap = fTech?.closest('div');
+  if (fTeamWrap) fTeamWrap.style.display = 'none';
+  if (fTechWrap) fTechWrap.style.display = 'none';
+
+  // Sincronizeaza vizibilitatea optiunilor
+  syncTeamFilter();
 }
 
 // ╔══════════════════════════════════════════╗
