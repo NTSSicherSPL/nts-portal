@@ -1581,20 +1581,19 @@ function renderP() {
       const members = TEAM_MEMBERS[tm] || [];
       if (!members.some(m => (r.technicieni||'').includes(m))) return false;
     }
-    // Elimina inregistrarile de pe 26 aprilie
-    if (ds.includes('-04-26')) return false;
     return true;
   }).sort((a,b) => (getDateStr(b.data)||'').localeCompare(getDateStr(a.data)||''));
 
-  // Zile lucrate = suma tuturor rapoartelor (nr total intrări)
+  // Zile lucrate = nr total rapoarte (intrări)
   const totalDays = data.length;
-  // Site-uri = nr site-uri unice (non-empty, non-dash)
-  const uniqueSites = new Set(
-    data.map(r => (r.nrSite||'').trim()).filter(s => s && s !== '—')
-  );
+  // Site-uri = nr total rapoarte cu site valid (fiecare raport = 1 site lucrat)
+  const totalSites = data.filter(r => {
+    const s = (r.nrSite||'').trim();
+    return s && s !== '—';
+  }).length;
 
   document.getElementById('sDays').textContent  = totalDays;
-  document.getElementById('sSites').textContent = uniqueSites.size;
+  document.getElementById('sSites').textContent = totalSites;
 
   const tb = document.getElementById('ptbody');
   if (!data.length) {
