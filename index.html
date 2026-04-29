@@ -1593,10 +1593,11 @@ function renderP() {
 
   // Zile lucrate = nr total rapoarte (intrări)
   const totalDays = data.length;
-  // Site-uri = nr site-uri UNICE (non-empty, non-dash) — același site lucrat de 2x = 1 site
+  // Site-uri = nr site-uri UNICE — același site lucrat de 2x = 1 site
+  // Normalizare: trim + uppercase + elimina .0 de la numere float (ex: 123456.0 → 123456)
+  const normSite = v => String(v == null ? '' : v).trim().replace(/\.0+$/, '').toUpperCase();
   const uniqueSites = new Set(
-    data.map(r => String(r.nrSite == null ? '' : r.nrSite).trim().toUpperCase())
-        .filter(s => s && s !== '—' && s !== '')
+    data.map(r => normSite(r.nrSite)).filter(s => s && s !== '—' && s !== '')
   );
 
   document.getElementById('sDays').textContent  = totalDays;
