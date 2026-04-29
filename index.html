@@ -645,6 +645,19 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
       </div>
     </div>
 
+    <!-- Buton deschide in GSheets -->
+    <a id="planGsheetsBtn" href="#" target="_blank"
+      style="display:flex;align-items:center;justify-content:center;gap:9px;
+             margin-top:10px;padding:12px 16px;
+             background:var(--card);border:1px solid var(--b2);border-radius:var(--r);
+             color:var(--accent);text-decoration:none;
+             font-family:'Rajdhani',sans-serif;font-size:.9rem;font-weight:700;letter-spacing:.08em;
+             transition:all .2s;"
+      onmouseover="this.style.background='rgba(0,170,255,.08)';this.style.borderColor='var(--accent)';"
+      onmouseout="this.style.background='var(--card)';this.style.borderColor='var(--b2)';">
+      <span style="font-size:1.1rem;">📊</span> Deschide în Google Sheets
+    </a>
+
   </div>
 
   <!-- ── PAGE 2: SOLICITĂRI ── -->
@@ -878,6 +891,7 @@ async function syncAll(silent=false) {
       // planSheets vine deja din getData — aplica direct fara apel separat
       if (gData.planSheets && gData.planSheets.length) {
         PLAN_SHEET_NAMES = gData.planSheets.map(s => (s.name||s).toUpperCase()).filter(n => /^KW\d{2}$/i.test(n)).sort();
+        gData.planSheets.forEach(s => { if (s.gid != null) PLAN_SHEET_GIDS[(s.name||s).toUpperCase()] = s.gid; });
       }
       applyGasSheets();
       renderCert();
@@ -1271,6 +1285,7 @@ const PLAN_SS_ID      = '1VfP_SvzaJBUu4BVLmsxTL-s6vrmDXogueBYSCrg0rAs';
 const PLAN_URL_DEFAULT = 'https://docs.google.com/spreadsheets/d/' + PLAN_SS_ID + '/pubhtml';
 
 let PLAN_SHEET_NAMES = [];
+let PLAN_SHEET_GIDS  = {};   // map name → gid pentru link direct la foaie
 let planCurrentIdx   = 0;
 let planRefreshTimer = null;
 
@@ -1384,6 +1399,8 @@ async function renderPlan() {
 
   if (gasSheets && gasSheets.length) {
     PLAN_SHEET_NAMES = gasSheets.sort();
+    // Salveaza gid-urile daca sunt disponibile
+    if (gData.planSheets) gData.planSheets.forEach(s => { if (s.gid != null) PLAN_SHEET_GIDS[(s.name||s).toUpperCase()] = s.gid; });
     if (st) st.textContent = '✅ ' + PLAN_SHEET_NAMES.length + ' săptămâni găsite via GAS';
   } else {
     // GAS nu are getPlanSheets — fallback la lista hardcodată + săptămâna curentă
@@ -1436,6 +1453,12 @@ async function loadPlanSheet(idx) {
   if (sel)  sel.value = name;
   if (prev) prev.style.opacity = idx===0 ? '0.3' : '1';
   if (next) next.style.opacity = idx===PLAN_SHEET_NAMES.length-1 ? '0.3' : '1';
+  // Actualizeaza link-ul butonului GSheets cu foaia curenta
+  const gsBtn = document.getElementById('planGsheetsBtn');
+  if (gsBtn) {
+    const gid = PLAN_SHEET_GIDS[name];
+    gsBtn.href = 'https://docs.google.com/spreadsheets/d/' + PLAN_SS_ID + '/edit' + (gid != null ? '#gid=' + gid : '');
+  }
   if (st)   st.textContent = '⏳ Se încarcă ' + name + ' din GAS...';
   if (wrap) wrap.innerHTML = `<div class="frame-ph" style="min-height:200px;">
     <div class="bi" style="animation:pulse .9s infinite;">📊</div>
