@@ -625,19 +625,45 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
   <!-- ── PAGE 1: PLAN SĂPTĂMÂNAL ── -->
   <div class="page" id="p1">
 
-    <!-- Label săptămână curentă -->
-    <div style="display:flex;align-items:center;justify-content:center;margin-bottom:8px;">
+    <!-- Label săptămână curentă + săgeți navigare -->
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px;">
+
+      <!-- Săgeată STÂNGA -->
+      <button id="planBtnPrev" onclick="planNav(-1)" style="
+        flex-shrink:0;
+        width:46px;height:46px;
+        background:var(--card);border:1px solid var(--b2);
+        border-radius:10px;
+        color:var(--accent);font-size:1.8rem;line-height:1;
+        display:flex;align-items:center;justify-content:center;
+        cursor:pointer;
+        -webkit-tap-highlight-color:transparent;
+        transition:background .2s,opacity .2s;">&#8249;</button>
+
       <select id="planSelect" onchange="planSelectSheet(this.value)" style="
         height:46px;font-size:1rem;font-family:'Rajdhani',sans-serif;
         font-weight:700;letter-spacing:.06em;text-align:center;
         background:var(--card);border:1px solid var(--b2);
         border-radius:10px;color:var(--text);cursor:pointer;
-        padding:0 14px;max-width:260px;width:100%;">
+        padding:0 14px;max-width:240px;width:100%;">
         <option value="">📅  Se încarcă...</option>
       </select>
+
+      <!-- Săgeată DREAPTA -->
+      <button id="planBtnNext" onclick="planNav(1)" style="
+        flex-shrink:0;
+        width:46px;height:46px;
+        background:var(--card);border:1px solid var(--b2);
+        border-radius:10px;
+        color:var(--accent);font-size:1.8rem;line-height:1;
+        display:flex;align-items:center;justify-content:center;
+        cursor:pointer;
+        -webkit-tap-highlight-color:transparent;
+        transition:background .2s,opacity .2s;">&#8250;</button>
+
     </div>
 
-    <!-- Plan iframe + săgeți overlay mari -->
+    <!-- Plan iframe -->
     <div style="position:relative;border-radius:var(--r);overflow:hidden;border:1px solid var(--b);" id="planWrap">
 
       <!-- Conținut iframe -->
@@ -645,30 +671,6 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
         <div class="bi">📊</div>
         <p>Se încarcă planul săptămânal din Google Sheets…</p>
       </div>
-
-      <!-- Săgeată STÂNGA — overlay mare -->
-      <button id="planBtnPrev" onclick="planNav(-1)" style="
-        position:absolute;left:0;top:0;bottom:0;
-        width:54px;
-        background:linear-gradient(90deg,rgba(10,22,40,.82) 0%,transparent 100%);
-        border:none;border-right:1px solid rgba(0,170,255,.12);
-        color:var(--accent);font-size:2.4rem;line-height:1;
-        display:flex;align-items:center;justify-content:center;
-        cursor:pointer;z-index:10;
-        -webkit-tap-highlight-color:transparent;
-        transition:background .2s;">&#8249;</button>
-
-      <!-- Săgeată DREAPTA — overlay mare -->
-      <button id="planBtnNext" onclick="planNav(1)" style="
-        position:absolute;right:0;top:0;bottom:0;
-        width:54px;
-        background:linear-gradient(270deg,rgba(10,22,40,.82) 0%,transparent 100%);
-        border:none;border-left:1px solid rgba(0,170,255,.12);
-        color:var(--accent);font-size:2.4rem;line-height:1;
-        display:flex;align-items:center;justify-content:center;
-        cursor:pointer;z-index:10;
-        -webkit-tap-highlight-color:transparent;
-        transition:background .2s;">&#8250;</button>
 
     </div>
 
@@ -1356,12 +1358,8 @@ function loadPlanSheet(idx) {
   iframe.src = url;
   iframe.style.cssText = 'width:100%;height:520px;border:none;display:block;';
   iframe.allowFullscreen = true;
-  // Insereaza inainte de sageata dreapta (sau la sfarsit)
-  if (next && next.parentNode === wrap) {
-    wrap.insertBefore(iframe, next);
-  } else {
-    wrap.appendChild(iframe);
-  }
+  // Insereaza iframeul in wrap (sagetile sunt acum in header, nu in wrap)
+  wrap.appendChild(iframe);
 
   // Sync dropdown
   const sel = document.getElementById('planSelect');
