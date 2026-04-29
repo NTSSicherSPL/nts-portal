@@ -886,6 +886,7 @@ async function syncAll(silent=false) {
     const res = await apiCall('GET', { action:'getData' });
     if(res && res.ok) {
       gData = res.data;
+      console.log('[NTS] certificari din Sheets:', JSON.stringify(gData.certificari));
       // Pastreaza PLAN_URL_DEFAULT daca GSheets nu are un plan_url setat
       if (!gData.plan_url) gData.plan_url = PLAN_URL_DEFAULT;
       // Push rapoartele locale nesincronizate dacă există
@@ -1509,6 +1510,14 @@ function fmtD(d){
 // ╔══════════════════════════════════════════╗
 // ║  PAGE 4 — CERTIFICĂRI                    ║
 // ╚══════════════════════════════════════════╝
+function certHasLink(val) {
+  if (!val) return false;
+  var s = String(val).trim().toLowerCase();
+  if (!s) return false;
+  if (s === 'null' || s === 'undefined' || s === '-' || s === '—' || s === 'n/a') return false;
+  return s.startsWith('http://') || s.startsWith('https://');
+}
+
 function renderCert() {
   const g = document.getElementById('certGrid');
   g.innerHTML = '';
@@ -1520,41 +1529,27 @@ function renderCert() {
     const th=document.createElement('div'); th.className='cert-team-ttl'; th.textContent=tn; g.appendChild(th);
     ms.forEach(t => {
       const entry = certs[t.ini] || {};
-      const lnk  = entry.url  || '';
-      const note = entry.nota || '';
+      const rawLnk = entry.url || '';
+      const hasLnk = certHasLink(rawLnk);
+      const lnk  = hasLnk ? String(rawLnk).trim() : '';
+      const note = (entry.nota || '').trim();
       const d=document.createElement('div'); d.className='cert-mbr'; d.id='cm-'+t.ini;
-      // Daca nu exista link: cardul apare gol — fara avatar, fara info, fara badge
-      // Doar butonul de editare ✏️ ramane vizibil discret pentru a putea adauga link-ul
-      if (lnk) {
-        d.innerHTML=`
-          <div class="cert-av">${t.ini}</div>
-          <div class="cert-info">
-            <div class="cert-name">${t.name}${t.pri?'<span class="star" style="margin-left:5px;">★</span>':''}</div>
-            <div class="cert-sub">${tn}</div>
-            ${note?`<div class="cert-note-txt">📝 ${note}</div>`:''}
-          </div>
-          <div class="cert-acts">
-            <a href="${lnk}" target="_blank" class="cert-btn" title="Vezi certificat">🏅 Certificat</a>
-            <button class="cert-edit-btn" onclick="togCE('${t.ini}')" title="Editează">✏️</button>
-          </div>
-          <div class="cert-edit-row" id="ce-${t.ini}">
-            <input type="text" id="cu-${t.ini}" placeholder="https://drive.google.com/…" value="${lnk}">
-            <input type="text" id="cn-${t.ini}" placeholder="Notă (ex: valabil 2025)" value="${note}" style="max-width:160px;">
-            <button class="btn-sm" onclick="saveCert('${t.ini}')">💾 Salvează</button>
-          </div>`;
-      } else {
-        // Fara link: card gol, doar editare discreta
-        d.style.cssText = 'background:transparent;border-color:transparent;padding:4px 12px;';
-        d.innerHTML=`
-          <div class="cert-acts" style="width:100%;justify-content:flex-end;">
-            <button class="cert-edit-btn" onclick="togCE('${t.ini}')" title="Adaugă certificat" style="opacity:.35;font-size:.7rem;">✏️ ${t.ini}</button>
-          </div>
-          <div class="cert-edit-row" id="ce-${t.ini}">
-            <input type="text" id="cu-${t.ini}" placeholder="https://drive.google.com/…" value="">
-            <input type="text" id="cn-${t.ini}" placeholder="Notă (ex: valabil 2025)" value="" style="max-width:160px;">
-            <button class="btn-sm" onclick="saveCert('${t.ini}')">💾 Salvează</button>
-          </div>`;
-      }
+      d.innerHTML=`
+        <div class="cert-av">${t.ini}</div>
+        <div class="cert-info">
+          <div class="cert-name">${t.name}${t.pri?'<span class="star" style="margin-left:5px;">&#9733;</span>':''}</div>
+          <div class="cert-sub">${tn}</div>
+          ${note?`<div class="cert-note-txt">&#128221; ${note}</div>`:''}
+        </div>
+        <div class="cert-acts">
+          ${hasLnk?`<a href="${lnk}" target="_blank" class="cert-btn" title="Vezi certificat">&#127973; Certificat</a>`:''}
+          <button class="cert-edit-btn" onclick="togCE('${t.ini}')" title="Editeaza">&#9999;&#65039;</button>
+        </div>
+        <div class="cert-edit-row" id="ce-${t.ini}">
+          <input type="text" id="cu-${t.ini}" placeholder="https://drive.google.com/..." value="${lnk}">
+          <input type="text" id="cn-${t.ini}" placeholder="Nota (ex: valabil 2025)" value="${note}" style="max-width:160px;">
+          <button class="btn-sm" onclick="saveCert('${t.ini}')">&#128190; Salveaza</button>
+        </div>`;
       g.appendChild(d);
     });
   });
