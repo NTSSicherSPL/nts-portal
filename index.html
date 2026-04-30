@@ -1393,8 +1393,8 @@ function planDataToHtml(name, rows, styles) {
   const tbHtml = body.map((row, ri) => {
     const gi  = ri + 1; // offset header în arrays GAS
     const tds = row.map((val, ci) => {
-      const s  = String(val ?? '').trim();
-      const lo = s.toLowerCase();
+      const s  = String(val ?? '').trim().replace(/\r?\n/g, '<br>');
+      const lo = s.replace(/<br>/g, ' ').toLowerCase();
 
       // Stil text din GAS
       const fw  = fws?.[gi]?.[ci] === 'bold'   ? 'font-weight:700;' : '';
@@ -1409,8 +1409,7 @@ function planDataToHtml(name, rows, styles) {
       else if (lo==='nefinalizat'||lo==='nu'||lo==='no') color = 'color:var(--red);font-weight:600;';
       else if (/^[A-Z]{2}\d{3,}/.test(s)||/^\d{7,}$/.test(s)) color = 'color:var(--gold);font-weight:600;';
 
-      const st = `padding:8px 10px;border-bottom:1px solid rgba(26,48,80,.4);
-        vertical-align:top;${color}${fw}${fi}${fz}`;
+      const st = `padding:8px 10px;border-bottom:1px solid rgba(26,48,80,.4);vertical-align:top;white-space:nowrap;${color}${fw}${fi}${fz}`;
       return `<td style="${st}">${s || '—'}</td>`;
     }).join('');
     const bg = ri%2!==0 ? 'background:rgba(0,170,255,.02);' : '';
