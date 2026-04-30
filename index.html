@@ -663,13 +663,13 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
 
     <!-- Buton NAS Synology -->
     <div style="position:relative;margin-bottom:16px;">
-      <a href="https://82.78.243.242:5001/" target="_blank"
+      <button onclick="openNAS()"
         style="display:flex;align-items:center;justify-content:center;gap:9px;
-               padding:14px 16px;
+               width:100%;padding:14px 16px;
                background:linear-gradient(135deg,#1a4a1a,#2d7a2d);
                border:1px solid rgba(0,204,77,.35);
                border-radius:var(--r);
-               color:#fff;text-decoration:none;
+               color:#fff;cursor:pointer;
                font-family:'Rajdhani',sans-serif;font-size:1rem;font-weight:700;letter-spacing:.1em;
                box-shadow:0 4px 16px rgba(0,160,60,.25);
                -webkit-tap-highlight-color:transparent;
@@ -677,7 +677,7 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
         onmouseover="this.style.opacity='.88';"
         onmouseout="this.style.opacity='1';">
         <span style="font-size:1.2rem;">🖥️</span> Deschide NAS Synology
-      </a>
+      </button>
       <!-- Credențiale rapide -->
       <div style="margin-top:8px;background:rgba(0,204,77,.06);border:1px solid rgba(0,204,77,.18);
                   border-radius:8px;padding:10px 13px;display:flex;align-items:center;
@@ -873,6 +873,33 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbxAjOgmiqOrj-DdgYfL57cT
 
 // ╔══════════════════════════════════════════╗
 // ║  NAS SYNOLOGY                            ║
+// ── Deschide DS File app, fallback web DSM ─
+function openNAS() {
+  const webDSM = 'https://nts2022.ddns.net:5001/';
+  // Schema deep-link DS File (Synology)
+  const dsFileURL = 'dsfile://';
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isAndroid = /android/i.test(navigator.userAgent);
+
+  if (isIOS || isAndroid) {
+    // Încearcă să deschidă DS File; dacă nu e instalat, deschide Web DSM după timeout
+    let opened = false;
+    const fallbackTimer = setTimeout(() => {
+      if (!opened) window.open(webDSM, '_blank');
+    }, 1500);
+    // Detectare blur = app s-a deschis
+    window.addEventListener('blur', function onBlur() {
+      opened = true;
+      clearTimeout(fallbackTimer);
+      window.removeEventListener('blur', onBlur);
+    }, { once: true });
+    window.location.href = dsFileURL;
+  } else {
+    // Desktop → direct Web DSM
+    window.open(webDSM, '_blank');
+  }
+}
+
 // ╚══════════════════════════════════════════╝
 const NAS_USER = 'Field';
 const NAS_PASS = 'TEAMWork2025!NtS';
