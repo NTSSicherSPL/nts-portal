@@ -447,14 +447,14 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
 
     <!-- STEP 1: email -->
     <div class="ao-view on" id="vEmail">
-      <div class="ao-note">Introdu adresa ta de <strong>email</strong> și numele.<br>Dacă accesul este aprobat, vei intra direct sau vei fi rugat să introduci un <strong>cod de verificare</strong>.</div>
+      <div class="ao-note">Introdu adresa ta de <strong>email</strong> și numele.<br>Solicitarea va fi înregistrată și verificată de administratorul NTS.</div>
       <label class="ao-lbl">Adresa email</label>
       <input class="ao-inp" id="inpEmail" type="email" placeholder="nume@gmail.com" autocomplete="email" inputmode="email">
       <div class="ao-err" id="errEmail"></div>
       <label class="ao-lbl">Numele tău</label>
       <input class="ao-inp" id="inpName" type="text" placeholder="Prenume Nume" autocomplete="name">
       <button class="ao-btn" id="btnSendCode" onclick="stepSendCode()">📨 Solicită acces</button>
-      <div class="ao-lock">🔒 Sistemul verifică accesul cu administratorul NTS</div>
+      <div class="ao-lock">🔒 Aprobarea se face manual de administratorul NTS</div>
     </div>
 
     <!-- STEP 2: OTP -->
@@ -478,8 +478,8 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
     <!-- PENDING -->
     <div class="ao-view" id="vPending">
       <div class="ao-big" style="animation:pulse 2.2s infinite">⏳</div>
-      <div class="ao-pt">Solicitare înregistrată!</div>
-      <div class="ao-pm">Cererea ta a fost înregistrată. Administratorul NTS va verifica solicitarea și va aproba accesul.<br><br>Revino mai târziu sau apasă <strong style="color:var(--text)">Verifică acum</strong> pentru a verifica statusul.</div>
+      <div class="ao-pt">Se așteaptă aprobarea administratorului NTS</div>
+      <div class="ao-pm">Cererea ta a fost înregistrată. Vei primi acces imediat ce administratorul NTS aprobă solicitarea.<br><br>Apasă <strong style="color:var(--text)">Verifică acum</strong> pentru a verifica statusul.</div>
       <div class="ao-adm">networkticketsolution@gmail.com</div>
       <div class="ao-poll"><div class="ao-polldot"></div><span id="pollTxt">Se verifică automat în 30s...</span></div>
       <button class="ao-sec" onclick="pollNow()">🔄 Verifică acum</button>
@@ -2062,22 +2062,15 @@ async function stepSendCode() {
     const status = res.status || res.accessStatus || null;
     if (!status) throw new Error('GAS-ul nu a returnat un status. Redeploy GAS.');
 
-    if (status === 'approved' && res.autoApproved) {
-      // ✅ User verificat anterior (status=verified) SAU aprobat fără OTP
-      // → acces instant din orice browser, fără cod
+    if (status === 'approved') {
+      // Admin a aprobat din GSheet → acces direct, salvează sesiunea local
       saveSession({ ...authUser, status:'approved' });
       grantAccess(authUser);
 
-    } else if (status === 'approved' && res.otpSent) {
-      // Prima autentificare → afișează ecranul OTP
-      document.getElementById('otpEmail').textContent = email;
-      document.getElementById('inpOtp').value = '';
-      showView('vOtp');
-
     } else if (status === 'pending' || status === 'new') {
       showView('vPending'); startPoll();
-      if (status === 'new') toast('✔ Solicitare înregistrată! Așteaptă aprobarea adminului.');
-      else                  toast('Cerere retrimisă. Așteaptă aprobarea adminului.');
+      if (status === 'new') toast('✔ Solicitare înregistrată! Așteaptă aprobarea administratorului NTS.');
+      else                  toast('⏳ Cerere în așteptare. Așteaptă aprobarea administratorului NTS.');
 
     } else if (status === 'denied') {
       showView('vDenied');
@@ -2129,7 +2122,7 @@ async function stepResend() {
     if (res && res.otpSent) {
       document.getElementById('inpOtp').value = '';
       showView('vOtp');
-      toast('✉ Cod nou trimis pe email!');
+      toast('🔄 Verificați cu administratorul NTS.');
     } else {
       showView('vOtp');
       toast('Nu s-a putut retrimite codul.', true);
@@ -2186,8 +2179,13 @@ async function pollNow() {
       action: 'checkStatus', email: authUser.email
     });
     if (!res) { startPoll(); return; }
-    if      (res.status === 'approved') { showView('vSpin'); await stepSendCode(); }
-    else if (res.status === 'denied')   { showView('vDenied'); }
+    if (res.status === 'approved') {
+      // Admin a aprobat din GSheet → acces direct
+      setSpin('Acces aprobat! Se conectează...');
+      showView('vSpin');
+      saveSession({ ...authUser, status:'approved' });
+      grantAccess(authUser);
+    } else if (res.status === 'denied') { showView('vDenied'); }
     else                                { startPoll(); }
   } catch(e) { startPoll(); }
 }
