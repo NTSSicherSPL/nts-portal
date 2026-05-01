@@ -1762,13 +1762,21 @@ function renderP() {
   const tf = document.getElementById('fTech').value;
   const tm = document.getElementById('fTeam').value;
 
+  // Normalizare nume: lowercase + sortare cuvinte → indiferent de ordine sau majuscule
+  const normName = n => n.toLowerCase().trim().split(/\s+/).sort().join(' ');
+  const splitTechs = s => (s || '').split(',').map(n => n.trim()).filter(Boolean);
+
   let data = rapoarte.filter(r => {
     const ds = getDateStr(r.data);
     if (mf && !ds.startsWith(mf)) return false;
-    if (tf && !r.technicieni?.includes(tf)) return false;
+    if (tf) {
+      const tfNorm = normName(tf);
+      if (!splitTechs(r.technicieni).some(n => normName(n) === tfNorm)) return false;
+    }
     if (tm) {
       const members = TEAM_MEMBERS[tm] || [];
-      if (!members.some(m => (r.technicieni||'').includes(m))) return false;
+      const techs = splitTechs(r.technicieni);
+      if (!members.some(m => techs.some(t => normName(t) === normName(m)))) return false;
     }
     return true;
   }).sort((a,b) => (getDateStr(b.data)||'').localeCompare(getDateStr(a.data)||''));
