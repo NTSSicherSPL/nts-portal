@@ -2059,6 +2059,7 @@ async function stepSendCode() {
     } else if (status === 'pending' || status === 'new') {
       showView('vPending'); startPoll();
       if (status === 'new') toast('✉ Solicitare trimisă spre aprobare!');
+      if (status === 'pending') toast('✉ Cerere retrimisă spre aprobare!');
       // Debug email errors
       if (res.adminEmailError) console.warn('Email admin EROARE:', res.adminEmailError);
       if (res.userEmailError)  console.warn('Email user EROARE:',  res.userEmailError);
