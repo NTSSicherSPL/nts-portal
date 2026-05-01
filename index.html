@@ -480,7 +480,7 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
       <div class="ao-big" style="animation:pulse 2.2s infinite">⏳</div>
       <div class="ao-pt">Solicitare trimisă!</div>
       <div class="ao-pm">Cererea ta a fost înregistrată. Administratorul NTS va fi notificat și va aproba accesul.<br><br>Vei primi un <strong style="color:var(--text)">email de confirmare</strong> când accesul este aprobat. Poți reveni și verifica manual mai jos.</div>
-      <div class="ao-adm">alin.spulbatu@networkticketsolution.com</div>
+      <div class="ao-adm">networkticketsolution@gmail.com</div>
       <div class="ao-poll"><div class="ao-polldot"></div><span id="pollTxt">Se verifică automat în 30s...</span></div>
       <button class="ao-sec" onclick="pollNow()">🔄 Verifică acum</button>
       <button class="ao-sec" onclick="resetAuth()">↩ Schimbă emailul</button>
@@ -491,7 +491,7 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
       <div class="ao-big">⛔</div>
       <div class="ao-pt" style="color:var(--red)">Acces refuzat</div>
       <div class="ao-pm">Administratorul NTS a refuzat accesul pentru emailul tău. Contactează pentru clarificări:</div>
-      <div class="ao-adm">alin.spulbatu@networkticketsolution.com</div>
+      <div class="ao-adm">networkticketsolution@gmail.com</div>
       <button class="ao-sec" onclick="resetAuth()">↩ Încearcă cu alt email</button>
     </div>
 
@@ -1994,7 +1994,7 @@ if('serviceWorker' in navigator){
 // ║  Fără Google Cloud Console — funcționează direct cu GAS      ║
 // ╚════════════════════════════════════════════════════════════════╝
 
-const ADMIN_MAIL = 'alin.spulbatu@networkticketsolution.com';
+const ADMIN_MAIL = 'networkticketsolution@gmail.com';
 const SESS_KEY   = 'nts_s2';
 const SESS_TTL   = 100 * 365 * 24 * 60 * 60 * 1000; // Permanent
 
@@ -2059,6 +2059,9 @@ async function stepSendCode() {
     } else if (status === 'pending' || status === 'new') {
       showView('vPending'); startPoll();
       if (status === 'new') toast('✉ Solicitare trimisă spre aprobare!');
+      // Debug email errors
+      if (res.adminEmailError) console.warn('Email admin EROARE:', res.adminEmailError);
+      if (res.userEmailError)  console.warn('Email user EROARE:',  res.userEmailError);
     } else if (status === 'denied') {
       showView('vDenied');
     } else {
