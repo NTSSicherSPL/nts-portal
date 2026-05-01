@@ -447,7 +447,7 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
 
     <!-- STEP 1: email -->
     <div class="ao-view on" id="vEmail">
-      <div class="ao-note">Introdu adresa ta de <strong>email</strong>.<br>Vei primi un <strong>cod de verificare</strong> dacă accesul este aprobat.</div>
+      <div class="ao-note">Introdu adresa ta de <strong>email</strong> și numele.<br>Dacă accesul este aprobat, vei intra direct sau vei fi rugat să introduci un <strong>cod de verificare</strong>.</div>
       <label class="ao-lbl">Adresa email</label>
       <input class="ao-inp" id="inpEmail" type="email" placeholder="nume@gmail.com" autocomplete="email" inputmode="email">
       <div class="ao-err" id="errEmail"></div>
@@ -459,7 +459,7 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
 
     <!-- STEP 2: OTP -->
     <div class="ao-view" id="vOtp">
-      <div class="ao-note">Am trimis un cod de <strong>6 cifre</strong> la<br><strong id="otpEmail"></strong></div>
+      <div class="ao-note">Introdu codul de <strong>6 cifre</strong> primit de la administratorul NTS pentru<br><strong id="otpEmail"></strong></div>
       <label class="ao-lbl">Cod de verificare</label>
       <input class="ao-inp otp" id="inpOtp" type="text" maxlength="6"
              placeholder="______" inputmode="numeric" pattern="[0-9]*"
@@ -478,8 +478,8 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
     <!-- PENDING -->
     <div class="ao-view" id="vPending">
       <div class="ao-big" style="animation:pulse 2.2s infinite">⏳</div>
-      <div class="ao-pt">Solicitare trimisă!</div>
-      <div class="ao-pm">Cererea ta a fost înregistrată. Administratorul NTS va fi notificat și va aproba accesul.<br><br>Vei primi un <strong style="color:var(--text)">email de confirmare</strong> când accesul este aprobat. Poți reveni și verifica manual mai jos.</div>
+      <div class="ao-pt">Solicitare înregistrată!</div>
+      <div class="ao-pm">Cererea ta a fost înregistrată. Administratorul NTS va verifica solicitarea și va aproba accesul.<br><br>Revino mai târziu sau apasă <strong style="color:var(--text)">Verifică acum</strong> pentru a verifica statusul.</div>
       <div class="ao-adm">networkticketsolution@gmail.com</div>
       <div class="ao-poll"><div class="ao-polldot"></div><span id="pollTxt">Se verifică automat în 30s...</span></div>
       <button class="ao-sec" onclick="pollNow()">🔄 Verifică acum</button>
@@ -2039,7 +2039,7 @@ function setErr(id, msg) {
 }
 function setSpin(txt) { showView('vSpin'); const e=document.getElementById('spinTxt'); if(e) e.textContent=txt||'Se verifică...'; }
 
-// ── STEP 1: trimite cerere + cod OTP ─────────────────────────────
+// ── STEP 1: verifică accesul ──────────────────────────────────────
 async function stepSendCode() {
   const email = (document.getElementById('inpEmail').value||'').trim().toLowerCase();
   const name  = (document.getElementById('inpName').value||'').trim();
@@ -2055,50 +2055,35 @@ async function stepSendCode() {
   try {
     const res = await apiCall('GET', { action:'requestOtp', email, name });
 
-    // Diagnosticare completa raspuns
-    console.log('requestOtp raspuns:', JSON.stringify(res));
-
     if (!res) throw new Error('Fără răspuns de la server');
-
-    // GAS vechi — nu cunoaste actiunea requestOtp
     if (res.ok === false && res.error) throw new Error('GAS: ' + res.error);
-
-    // Fallback no-cors — nu putem citi raspunsul
-    if (res.nocors) throw new Error('Raspunsul GAS nu poate fi citit (CORS). Verifica deployment-ul.');
+    if (res.nocors) throw new Error('Eroare CORS. Verifică deployment-ul GAS.');
 
     const status = res.status || res.accessStatus || null;
-
-    if (!status) {
-      throw new Error('GAS-ul nu a returnat un status. Asigura-te ca scriptul NTS_Portal.gs a fost uploadat si redeploy-uit.');
-    }
+    if (!status) throw new Error('GAS-ul nu a returnat un status. Redeploy GAS.');
 
     if (status === 'approved' && res.autoApproved) {
-      // ✅ FIX: User deja verificat anterior (status='verified' în sheet)
-      // → acces direct fără OTP nou
+      // ✅ User verificat anterior (status=verified) SAU aprobat fără OTP
+      // → acces instant din orice browser, fără cod
       saveSession({ ...authUser, status:'approved' });
       grantAccess(authUser);
-      return; // grantAccess preia controlul
+
     } else if (status === 'approved' && res.otpSent) {
-      // Prima autentificare → afisam ecranul OTP
+      // Prima autentificare → afișează ecranul OTP
       document.getElementById('otpEmail').textContent = email;
       document.getElementById('inpOtp').value = '';
       showView('vOtp');
-    } else if (status === 'approved' && !res.otpSent && !res.autoApproved) {
-      // Aprobat dar fără cod setat de admin
-      setErr('errEmail', '⚠ Contul este aprobat dar administratorul nu a setat încă un cod de acces. Te rugăm să aștepți sau contactează adminul.');
-      showView('vEmail');
-      return;
+
     } else if (status === 'pending' || status === 'new') {
       showView('vPending'); startPoll();
-      if (status === 'new') toast('✉ Solicitare trimisă spre aprobare!');
-      if (status === 'pending') toast('✉ Cerere retrimisă spre aprobare!');
-      // Debug email errors
-      if (res.adminEmailError) console.warn('Email admin EROARE:', res.adminEmailError);
-      if (res.userEmailError)  console.warn('Email user EROARE:',  res.userEmailError);
+      if (status === 'new') toast('✔ Solicitare înregistrată! Așteaptă aprobarea adminului.');
+      else                  toast('Cerere retrimisă. Așteaptă aprobarea adminului.');
+
     } else if (status === 'denied') {
       showView('vDenied');
+
     } else {
-      throw new Error('Status necunoscut primit: ' + status);
+      throw new Error('Status necunoscut: ' + status);
     }
   } catch(e) {
     showView('vEmail');
