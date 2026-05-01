@@ -479,8 +479,8 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
     <div class="ao-view" id="vPending">
       <div class="ao-big" style="animation:pulse 2.2s infinite">⏳</div>
       <div class="ao-pt">Solicitare trimisă!</div>
-      <div class="ao-pm">Cererea ta a fost înregistrată. Administratorul NTS va fi notificat și va aproba accesul.<br><br>Revino și încearcă din nou după aprobare.</div>
-      <div class="ao-adm">networkticketsolution@gmail.com</div>
+      <div class="ao-pm">Cererea ta a fost înregistrată. Administratorul NTS va fi notificat și va aproba accesul.<br><br>Vei primi un <strong style="color:var(--text)">email de confirmare</strong> când accesul este aprobat. Poți reveni și verifica manual mai jos.</div>
+      <div class="ao-adm">alin.spulbatu@networkticketsolution.com</div>
       <div class="ao-poll"><div class="ao-polldot"></div><span id="pollTxt">Se verifică automat în 30s...</span></div>
       <button class="ao-sec" onclick="pollNow()">🔄 Verifică acum</button>
       <button class="ao-sec" onclick="resetAuth()">↩ Schimbă emailul</button>
@@ -491,7 +491,7 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
       <div class="ao-big">⛔</div>
       <div class="ao-pt" style="color:var(--red)">Acces refuzat</div>
       <div class="ao-pm">Administratorul NTS a refuzat accesul pentru emailul tău. Contactează pentru clarificări:</div>
-      <div class="ao-adm">networkticketsolution@gmail.com</div>
+      <div class="ao-adm">alin.spulbatu@networkticketsolution.com</div>
       <button class="ao-sec" onclick="resetAuth()">↩ Încearcă cu alt email</button>
     </div>
 
@@ -506,6 +506,15 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
       <button class="adm-cls" onclick="closeAdmPanel()">✕ Închide</button>
     </div>
     <div id="admList"><div class="adm-empty">Se încarcă...</div></div>
+  </div>
+</div>
+
+<!-- ══ APPROVE OVERLAY (acces via link din email) ══ -->
+<div id="approveOv" style="display:none;position:fixed;inset:0;z-index:9500;background:var(--bg);display:none;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--card);border:1px solid var(--green);border-radius:16px;padding:32px 24px;max-width:400px;width:100%;text-align:center;">
+    <div id="approveIcon" style="font-size:3rem;margin-bottom:12px;">⏳</div>
+    <div id="approveTitle" style="font-family:'Rajdhani',sans-serif;font-size:1.3rem;font-weight:700;color:var(--green);margin-bottom:8px;">Se procesează...</div>
+    <div id="approveMsg" style="font-size:.82rem;color:var(--dim);line-height:1.6;"></div>
   </div>
 </div>
 
@@ -1985,7 +1994,7 @@ if('serviceWorker' in navigator){
 // ║  Fără Google Cloud Console — funcționează direct cu GAS      ║
 // ╚════════════════════════════════════════════════════════════════╝
 
-const ADMIN_MAIL = 'networkticketsolution@gmail.com';
+const ADMIN_MAIL = 'alin.spulbatu@networkticketsolution.com';
 const SESS_KEY   = 'nts_s2';
 const SESS_TTL   = 100 * 365 * 24 * 60 * 60 * 1000; // Permanent
 
@@ -2282,8 +2291,68 @@ function clearSession() {
   try { localStorage.removeItem(SESS_KEY); } catch(e){}
 }
 
+// ══ APROBARE VIA LINK DIN EMAIL ═══════════════════════════════════
+async function handleApproveLink() {
+  const params = new URLSearchParams(window.location.search);
+  const approveEmail = params.get('approve');
+  const approveToken = params.get('token');
+  if (!approveEmail || !approveToken) return false;
+
+  // Curata URL-ul din bara de adrese
+  window.history.replaceState({}, document.title, window.location.pathname);
+
+  // Arata overlay-ul de procesare
+  const ov = document.getElementById('approveOv');
+  ov.style.display = 'flex';
+  document.getElementById('approveIcon').textContent = '⏳';
+  document.getElementById('approveTitle').textContent = 'Se procesează aprobarea...';
+  document.getElementById('approveMsg').textContent = `Aprobare acces pentru: ${approveEmail}`;
+
+  try {
+    const res = await apiCall('GET', {
+      action: 'approveViaLink',
+      targetEmail: approveEmail,
+      token: approveToken,
+    });
+
+    if (res && res.ok) {
+      document.getElementById('approveIcon').textContent = '✅';
+      document.getElementById('approveTitle').style.color = 'var(--green)';
+      document.getElementById('approveTitle').textContent = 'Acces aprobat!';
+      document.getElementById('approveMsg').textContent = `Utilizatorul ${approveEmail} a primit acces la NTS Group Portal. Poate acum să se autentifice.`;
+      setTimeout(() => {
+        ov.style.display = 'none';
+        showView('vEmail');
+      }, 3500);
+    } else {
+      document.getElementById('approveIcon').textContent = '⚠️';
+      document.getElementById('approveTitle').style.color = 'var(--gold)';
+      document.getElementById('approveTitle').textContent = 'Atenție';
+      document.getElementById('approveMsg').textContent = res?.error || 'Link-ul de aprobare este invalid sau expirat. Folosiți panoul admin din aplicație.';
+      setTimeout(() => {
+        ov.style.display = 'none';
+        showView('vEmail');
+      }, 4000);
+    }
+  } catch(e) {
+    document.getElementById('approveIcon').textContent = '❌';
+    document.getElementById('approveTitle').style.color = 'var(--red)';
+    document.getElementById('approveTitle').textContent = 'Eroare';
+    document.getElementById('approveMsg').textContent = 'Nu s-a putut procesa aprobarea: ' + e.message;
+    setTimeout(() => {
+      ov.style.display = 'none';
+      showView('vEmail');
+    }, 4000);
+  }
+  return true;
+}
+
 // ══ ENTRY POINT ═══════════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  // Verifica daca URL-ul contine un link de aprobare din email
+  const isApproveLink = await handleApproveLink();
+  if (isApproveLink) return;
+
   const s = loadSession();
   if (s && s.status === 'approved') {
     authUser = s;
