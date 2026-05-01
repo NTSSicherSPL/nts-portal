@@ -457,18 +457,6 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
       <div class="ao-lock">🔒 Aprobarea se face manual de administratorul NTS</div>
     </div>
 
-    <!-- STEP 2: OTP -->
-    <div class="ao-view" id="vOtp">
-      <div class="ao-note">Introdu codul de <strong>6 cifre</strong> primit de la administratorul NTS pentru<br><strong id="otpEmail"></strong></div>
-      <label class="ao-lbl">Cod de verificare</label>
-      <input class="ao-inp otp" id="inpOtp" type="text" maxlength="6"
-             placeholder="______" inputmode="numeric" pattern="[0-9]*"
-             oninput="this.value=this.value.replace(/[^0-9]/g,'')">
-      <div class="ao-err" id="errOtp"></div>
-      <button class="ao-btn" id="btnVerify" onclick="stepVerifyOtp()">✔ Verifică codul</button>
-      <button class="ao-sec" onclick="stepResend()">🔄 Retrimite codul</button>
-      <button class="ao-sec" onclick="showView('vEmail')">↩ Schimbă emailul</button>
-    </div>
 
     <!-- SPINNER -->
     <div class="ao-view" id="vSpin">
@@ -507,14 +495,6 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
   </div>
 </div>
 
-<!-- ══ APPROVE OVERLAY (acces via link din email) ══ -->
-<div id="approveOv" style="display:none;position:fixed;inset:0;z-index:9500;background:var(--bg);display:none;align-items:center;justify-content:center;padding:20px;">
-  <div style="background:var(--card);border:1px solid var(--green);border-radius:16px;padding:32px 24px;max-width:400px;width:100%;text-align:center;">
-    <div id="approveIcon" style="font-size:3rem;margin-bottom:12px;">⏳</div>
-    <div id="approveTitle" style="font-family:'Rajdhani',sans-serif;font-size:1.3rem;font-weight:700;color:var(--green);margin-bottom:8px;">Se procesează...</div>
-    <div id="approveMsg" style="font-size:.82rem;color:var(--dim);line-height:1.6;"></div>
-  </div>
-</div>
 
 <!-- ══ LOADERS & TOASTS ══ -->
 <div class="lov" id="lov"><div class="spin"></div><div class="lov-txt" id="lovTxt">Se sincronizează...</div></div>
@@ -2021,8 +2001,7 @@ const SESS_KEY   = 'nts_s2';
 const SESS_TTL   = 100 * 365 * 24 * 60 * 60 * 1000; // Permanent
 
 let authUser  = null;
-let pollTimer = null;
-let pollSecs  = 30;
+
 
 // ── Afisare vista ─────────────────────────────────────────────────
 function showView(id) {
@@ -2082,55 +2061,6 @@ async function stepSendCode() {
   }
 }
 
-// ── STEP 2: verifica codul OTP ────────────────────────────────────
-async function stepVerifyOtp() {
-  const otp = (document.getElementById('inpOtp').value||'').trim();
-  setErr('errOtp','');
-  if (otp.length !== 6 || !/^\d{6}$/.test(otp)) {
-    setErr('errOtp','Codul trebuie să aibă exact 6 cifre.'); return;
-  }
-  setSpin('Se verifică codul...');
-  try {
-    const res = await apiCall('GET', {
-      action: 'verifyOtp',
-      email:  authUser.email,
-      otp:    otp,
-    });
-    if (res && res.ok && res.verified) {
-      saveSession({ ...authUser, status:'approved' });
-      grantAccess(authUser);
-    } else {
-      showView('vOtp');
-      setErr('errOtp', res?.error || 'Cod incorect sau expirat. Încearcă din nou.');
-    }
-  } catch(e) {
-    showView('vOtp');
-    setErr('errOtp', '⚠ ' + e.message);
-  }
-}
-
-// ── Retrimite cod ─────────────────────────────────────────────────
-async function stepResend() {
-  if (!authUser) { showView('vEmail'); return; }
-  setSpin('Se retrimite codul...');
-  try {
-    const res = await apiCall('GET', {
-      action: 'requestOtp', email: authUser.email, name: authUser.name
-    });
-    if (res && res.otpSent) {
-      document.getElementById('inpOtp').value = '';
-      showView('vOtp');
-      toast('🔄 Verificați cu administratorul NTS.');
-    } else {
-      showView('vOtp');
-      toast('Nu s-a putut retrimite codul.', true);
-    }
-  } catch(e) {
-    showView('vOtp');
-    toast('Eroare: ' + e.message, true);
-  }
-}
-
 // ── Acorda acces ──────────────────────────────────────────────────
 function grantAccess(user) {
   authUser = user;
@@ -2156,22 +2086,9 @@ function grantAccess(user) {
 }
 
 // ── Polling ───────────────────────────────────────────────────────
-function startPoll() {
-  clearInterval(pollTimer); pollSecs = 30; updatePollTxt();
-  pollTimer = setInterval(() => {
-    pollSecs--;
-    updatePollTxt();
-    if (pollSecs <= 0) { clearInterval(pollTimer); pollNow(); }
-  }, 1000);
-}
-function updatePollTxt() {
-  const el = document.getElementById('pollTxt');
-  if (el) el.textContent = pollSecs > 0
-    ? `Se verifică automat în ${pollSecs}s...` : 'Se verifică...';
-}
+
 async function pollNow() {
   if (!authUser) return;
-  clearInterval(pollTimer);
   const btn = document.querySelector('#vPending .ao-sec');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Se verifică...'; }
   try {
@@ -2210,10 +2127,9 @@ async function silentRecheck() {
 
 // ── Reset form ────────────────────────────────────────────────────
 function resetAuth() {
-  clearInterval(pollTimer);
   document.getElementById('inpEmail').value = '';
   document.getElementById('inpName').value  = '';
-  setErr('errEmail',''); setErr('errOtp','');
+  setErr('errEmail','');
   showView('vEmail');
 }
 
@@ -2315,71 +2231,11 @@ function clearSession() {
   try { localStorage.removeItem(SESS_KEY); } catch(e){}
 }
 
-// ══ APROBARE VIA LINK DIN EMAIL ═══════════════════════════════════
-async function handleApproveLink() {
-  const params = new URLSearchParams(window.location.search);
-  const approveEmail = params.get('approve');
-  const approveToken = params.get('token');
-  if (!approveEmail || !approveToken) return false;
-
-  // Curata URL-ul din bara de adrese
-  window.history.replaceState({}, document.title, window.location.pathname);
-
-  // Arata overlay-ul de procesare
-  const ov = document.getElementById('approveOv');
-  ov.style.display = 'flex';
-  document.getElementById('approveIcon').textContent = '⏳';
-  document.getElementById('approveTitle').textContent = 'Se procesează aprobarea...';
-  document.getElementById('approveMsg').textContent = `Aprobare acces pentru: ${approveEmail}`;
-
-  try {
-    const res = await apiCall('GET', {
-      action: 'approveViaLink',
-      targetEmail: approveEmail,
-      token: approveToken,
-    });
-
-    if (res && res.ok) {
-      document.getElementById('approveIcon').textContent = '✅';
-      document.getElementById('approveTitle').style.color = 'var(--green)';
-      document.getElementById('approveTitle').textContent = 'Acces aprobat!';
-      document.getElementById('approveMsg').textContent = `Utilizatorul ${approveEmail} a primit acces la NTS Group Portal. Poate acum să se autentifice.`;
-      setTimeout(() => {
-        ov.style.display = 'none';
-        showView('vEmail');
-      }, 3500);
-    } else {
-      document.getElementById('approveIcon').textContent = '⚠️';
-      document.getElementById('approveTitle').style.color = 'var(--gold)';
-      document.getElementById('approveTitle').textContent = 'Atenție';
-      document.getElementById('approveMsg').textContent = res?.error || 'Link-ul de aprobare este invalid sau expirat. Folosiți panoul admin din aplicație.';
-      setTimeout(() => {
-        ov.style.display = 'none';
-        showView('vEmail');
-      }, 4000);
-    }
-  } catch(e) {
-    document.getElementById('approveIcon').textContent = '❌';
-    document.getElementById('approveTitle').style.color = 'var(--red)';
-    document.getElementById('approveTitle').textContent = 'Eroare';
-    document.getElementById('approveMsg').textContent = 'Nu s-a putut procesa aprobarea: ' + e.message;
-    setTimeout(() => {
-      ov.style.display = 'none';
-      showView('vEmail');
-    }, 4000);
-  }
-  return true;
-}
-
 // ══ ENTRY POINT ═══════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async () => {
   // ✅ FIX PWA: injectează manifestul imediat — înainte de autentificare
   // Browserul are nevoie de manifest devreme pentru a evalua criteriile de instalare
   injectMF();
-
-  // Verifica daca URL-ul contine un link de aprobare din email
-  const isApproveLink = await handleApproveLink();
-  if (isApproveLink) return;
 
   const s = loadSession();
   if (s && s.status === 'approved') {
