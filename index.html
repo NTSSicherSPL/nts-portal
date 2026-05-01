@@ -479,9 +479,7 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
     <div class="ao-view" id="vPending">
       <div class="ao-big" style="animation:pulse 2.2s infinite">⏳</div>
       <div class="ao-pt">Se așteaptă aprobarea administratorului NTS</div>
-      <div class="ao-pm">Cererea ta a fost înregistrată. Vei primi acces imediat ce administratorul NTS aprobă solicitarea.<br><br>Apasă <strong style="color:var(--text)">Verifică acum</strong> pentru a verifica statusul.</div>
-      <div class="ao-adm">networkticketsolution@gmail.com</div>
-      <div class="ao-poll"><div class="ao-polldot"></div><span id="pollTxt">Se verifică automat în 30s...</span></div>
+      <div class="ao-pm">Cererea ta a fost înregistrată. Vei primi acces imediat ce administratorul NTS aprobă solicitarea.</div>
       <button class="ao-sec" onclick="pollNow()">🔄 Verifică acum</button>
       <button class="ao-sec" onclick="resetAuth()">↩ Schimbă emailul</button>
     </div>
@@ -2068,7 +2066,7 @@ async function stepSendCode() {
       grantAccess(authUser);
 
     } else if (status === 'pending' || status === 'new') {
-      showView('vPending'); startPoll();
+      showView('vPending');
       if (status === 'new') toast('✔ Solicitare înregistrată! Așteaptă aprobarea administratorului NTS.');
       else                  toast('⏳ Cerere în așteptare. Așteaptă aprobarea administratorului NTS.');
 
@@ -2174,20 +2172,27 @@ function updatePollTxt() {
 async function pollNow() {
   if (!authUser) return;
   clearInterval(pollTimer);
+  const btn = document.querySelector('#vPending .ao-sec');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Se verifică...'; }
   try {
     const res = await apiCall('GET', {
       action: 'checkStatus', email: authUser.email
     });
-    if (!res) { startPoll(); return; }
-    if (res.status === 'approved') {
-      // Admin a aprobat din GSheet → acces direct
+    if (res && res.status === 'approved') {
       setSpin('Acces aprobat! Se conectează...');
       showView('vSpin');
       saveSession({ ...authUser, status:'approved' });
       grantAccess(authUser);
-    } else if (res.status === 'denied') { showView('vDenied'); }
-    else                                { startPoll(); }
-  } catch(e) { startPoll(); }
+    } else if (res && res.status === 'denied') {
+      showView('vDenied');
+    } else {
+      toast('⏳ Încă în așteptare. Adminul nu a aprobat.');
+    }
+  } catch(e) {
+    toast('⚠ Eroare conexiune. Încearcă din nou.', true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Verifică acum'; }
+  }
 }
 
 // ── Recheck silentios ─────────────────────────────────────────────
