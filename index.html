@@ -522,13 +522,22 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
 <div class="lov" id="lov"><div class="spin"></div><div class="lov-txt" id="lovTxt">Se sincronizează...</div></div>
 <div class="toast" id="toast"></div>
 
-<!-- ══ INSTALL BANNER ══ -->
+<!-- ══ INSTALL BANNER (Android + Chrome) ══ -->
 <div class="ib hidden" id="ib">
   <div class="ib-icon">📋</div>
-  <div class="ib-txt"><strong>Instalează NTS Portal</strong><span>Adaugă pe ecranul principal Android</span></div>
+  <div class="ib-txt"><strong>Instalează NTS Portal</strong><span>Adaugă pe ecranul principal</span></div>
   <div class="ib-acts">
     <button class="ib-btn" id="btnInst">Instalează</button>
     <button class="ib-btn dis" id="btnDis">✕</button>
+  </div>
+</div>
+
+<!-- ══ INSTALL BANNER iOS ══ -->
+<div class="ib hidden" id="ibIos" style="flex-direction:column;gap:6px;padding:12px 14px;">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <div class="ib-icon">📲</div>
+    <div class="ib-txt"><strong>Instalează NTS Portal pe iOS</strong><span>Apasă <b>⎙ Share</b> → <b>Adaugă pe ecran principal</b></span></div>
+    <button class="ib-btn dis" id="btnDisIos" style="flex-shrink:0;">✕</button>
   </div>
 </div>
 
@@ -1957,7 +1966,22 @@ function injectMF(){
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e;setTimeout(()=>document.getElementById('ib').classList.remove('hidden'),2500);});
 document.getElementById('btnInst').addEventListener('click',async()=>{if(!dp)return;dp.prompt();const{outcome}=await dp.userChoice;if(outcome==='accepted')toast('✔ Instalat!');dp=null;document.getElementById('ib').classList.add('hidden');});
 document.getElementById('btnDis').addEventListener('click',()=>document.getElementById('ib').classList.add('hidden'));
+document.getElementById('btnDisIos').addEventListener('click',()=>document.getElementById('ibIos').classList.add('hidden'));
 window.addEventListener('appinstalled',()=>{document.getElementById('ib').classList.add('hidden');toast('✔ NTS Portal instalat!');});
+
+// ✅ FIX PWA iOS: detectează Safari pe iOS și afișează bannerul manual
+(function(){
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isInStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  const dismissed = localStorage.getItem('nts_ios_banner_dismissed');
+  if (isIos && !isInStandalone && !dismissed) {
+    setTimeout(() => document.getElementById('ibIos').classList.remove('hidden'), 3000);
+  }
+})();
+document.getElementById('btnDisIos').addEventListener('click', () => {
+  document.getElementById('ibIos').classList.add('hidden');
+  localStorage.setItem('nts_ios_banner_dismissed', '1');
+});
 if('serviceWorker' in navigator){
   const swCode = `
     const CACHE = 'nts-portal-v1';
@@ -2048,14 +2072,22 @@ async function stepSendCode() {
       throw new Error('GAS-ul nu a returnat un status. Asigura-te ca scriptul NTS_Portal.gs a fost uploadat si redeploy-uit.');
     }
 
-    if (status === 'approved' && res.otpSent) {
-      // Cont aprobat → afisam ecranul OTP
+    if (status === 'approved' && res.autoApproved) {
+      // ✅ FIX: User deja verificat anterior (status='verified' în sheet)
+      // → acces direct fără OTP nou
+      saveSession({ ...authUser, status:'approved' });
+      grantAccess(authUser);
+      return; // grantAccess preia controlul
+    } else if (status === 'approved' && res.otpSent) {
+      // Prima autentificare → afisam ecranul OTP
       document.getElementById('otpEmail').textContent = email;
       document.getElementById('inpOtp').value = '';
       showView('vOtp');
-    } else if (status === 'approved' && !res.otpSent) {
-      // Aprobat dar codul nu s-a putut trimite
-      throw new Error('Contul este aprobat dar codul nu s-a putut trimite pe email. Verifica adresa de email.');
+    } else if (status === 'approved' && !res.otpSent && !res.autoApproved) {
+      // Aprobat dar fără cod setat de admin
+      setErr('errEmail', '⚠ Contul este aprobat dar administratorul nu a setat încă un cod de acces. Te rugăm să aștepți sau contactează adminul.');
+      showView('vEmail');
+      return;
     } else if (status === 'pending' || status === 'new') {
       showView('vPending'); startPoll();
       if (status === 'new') toast('✉ Solicitare trimisă spre aprobare!');
@@ -2353,6 +2385,10 @@ async function handleApproveLink() {
 
 // ══ ENTRY POINT ═══════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async () => {
+  // ✅ FIX PWA: injectează manifestul imediat — înainte de autentificare
+  // Browserul are nevoie de manifest devreme pentru a evalua criteriile de instalare
+  injectMF();
+
   // Verifica daca URL-ul contine un link de aprobare din email
   const isApproveLink = await handleApproveLink();
   if (isApproveLink) return;
