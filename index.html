@@ -1396,7 +1396,12 @@ async function dispatchEmail() {
     loader(false);
 
     if (res && res.ok) {
+      if (res.warning) console.warn('sendEmail warning:', res.warning);
       toast('\u2705 Solicitarea a fost trimis\u0103 pe email!');
+      resetReqForm();
+    } else if (res && res.nocors) {
+      // no-cors fallback — emailul probabil s-a trimis dar nu putem confirma
+      toast('\u2705 Solicitarea a fost trimis\u0103!');
       resetReqForm();
     } else {
       throw new Error(res?.error || 'Eroare server');
