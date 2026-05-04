@@ -447,7 +447,7 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
 
     <!-- STEP 1: email -->
     <div class="ao-view on" id="vEmail">
-      <div class="ao-note">Introdu adresa ta de <strong>email</strong>.<br>Vei primi un <strong>cod de verificare</strong> dacă accesul este aprobat.</div>
+      <div class="ao-note">Introdu adresa ta de <strong>email</strong> și <strong>numele</strong>.<br>Accesul este aprobat manual de administratorul NTS.</div>
       <label class="ao-lbl">Adresa email</label>
       <input class="ao-inp" id="inpEmail" type="email" placeholder="nume@gmail.com" autocomplete="email" inputmode="email">
       <div class="ao-err" id="errEmail"></div>
@@ -455,19 +455,6 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
       <input class="ao-inp" id="inpName" type="text" placeholder="Prenume Nume" autocomplete="name">
       <button class="ao-btn" id="btnSendCode" onclick="stepSendCode()">📨 Solicită acces</button>
       <div class="ao-lock">🔒 Sistemul verifică accesul cu administratorul NTS</div>
-    </div>
-
-    <!-- STEP 2: OTP -->
-    <div class="ao-view" id="vOtp">
-      <div class="ao-note">Am trimis un cod de <strong>6 cifre</strong> la<br><strong id="otpEmail"></strong></div>
-      <label class="ao-lbl">Cod de verificare</label>
-      <input class="ao-inp otp" id="inpOtp" type="text" maxlength="6"
-             placeholder="______" inputmode="numeric" pattern="[0-9]*"
-             oninput="this.value=this.value.replace(/[^0-9]/g,'')">
-      <div class="ao-err" id="errOtp"></div>
-      <button class="ao-btn" id="btnVerify" onclick="stepVerifyOtp()">✔ Verifică codul</button>
-      <button class="ao-sec" onclick="stepResend()">🔄 Retrimite codul</button>
-      <button class="ao-sec" onclick="showView('vEmail')">↩ Schimbă emailul</button>
     </div>
 
     <!-- SPINNER -->
@@ -481,7 +468,6 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
       <div class="ao-pt">Solicitare trimisă!</div>
       <div class="ao-pm">Cererea ta a fost înregistrată. Administratorul NTS va fi notificat și va aproba accesul.<br><br>Revino și încearcă din nou după aprobare.</div>
       <div class="ao-adm">networkticketsolution@gmail.com</div>
-      <div class="ao-poll"><div class="ao-polldot"></div><span id="pollTxt">Se verifică automat în 30s...</span></div>
       <button class="ao-sec" onclick="pollNow()">🔄 Verifică acum</button>
       <button class="ao-sec" onclick="resetAuth()">↩ Schimbă emailul</button>
     </div>
@@ -1855,8 +1841,6 @@ const SESS_KEY   = 'nts_s2';
 const SESS_TTL   = 100 * 365 * 24 * 60 * 60 * 1000; // Permanent
 
 let authUser  = null;
-let pollTimer = null;
-let pollSecs  = 30;
 
 // ── Afisare vista ─────────────────────────────────────────────────
 function showView(id) {
@@ -1871,7 +1855,7 @@ function setErr(id, msg) {
 }
 function setSpin(txt) { showView('vSpin'); const e=document.getElementById('spinTxt'); if(e) e.textContent=txt||'Se verifică...'; }
 
-// ── STEP 1: trimite cerere + cod OTP ─────────────────────────────
+// ── STEP 1: solicita acces (fara OTP) ───────────────────────────────
 async function stepSendCode() {
   const email = (document.getElementById('inpEmail').value||'').trim().toLowerCase();
   const name  = (document.getElementById('inpName').value||'').trim();
@@ -1885,36 +1869,24 @@ async function stepSendCode() {
   setSpin('Se verifică accesul...');
 
   try {
-    const res = await apiCall('GET', { action:'requestOtp', email, name });
-
-    // Diagnosticare completa raspuns
-    console.log('requestOtp raspuns:', JSON.stringify(res));
+    const res = await apiCall('GET', { action:'requestAccess', email, name });
 
     if (!res) throw new Error('Fără răspuns de la server');
-
-    // GAS vechi — nu cunoaste actiunea requestOtp
-    if (res.ok === false && res.error) throw new Error('GAS: ' + res.error);
-
-    // Fallback no-cors — nu putem citi raspunsul
-    if (res.nocors) throw new Error('Raspunsul GAS nu poate fi citit (CORS). Verifica deployment-ul.');
+    if (res.nocors) throw new Error('Răspunsul GAS nu poate fi citit (CORS). Verifică deployment-ul.');
 
     const status = res.status || res.accessStatus || null;
 
     if (!status) {
-      throw new Error('GAS-ul nu a returnat un status. Asigura-te ca scriptul NTS_Portal.gs a fost uploadat si redeploy-uit.');
+      throw new Error('GAS-ul nu a returnat un status. Asigură-te că scriptul NTS_Portal.gs a fost uploadat și redeploy-uit.');
     }
 
-    if (status === 'approved' && res.otpSent) {
-      // Cont aprobat → afisam ecranul OTP
-      document.getElementById('otpEmail').textContent = email;
-      document.getElementById('inpOtp').value = '';
-      showView('vOtp');
-    } else if (status === 'approved' && !res.otpSent) {
-      // Aprobat dar codul nu s-a putut trimite
-      throw new Error('Contul este aprobat dar codul nu s-a putut trimite pe email. Verifica adresa de email.');
+    if (status === 'approved' || status === 'verified') {
+      // Acces aprobat în spreadsheet → intrare directă, fără OTP
+      saveSession({ ...authUser, status: 'approved' });
+      grantAccess(authUser);
     } else if (status === 'pending' || status === 'new') {
-      showView('vPending'); startPoll();
-      if (status === 'new') toast('✉ Solicitare trimisă spre aprobare!');
+      showView('vPending');
+      if (res.accessStatus === 'new' || status === 'new') toast('✔ Solicitare înregistrată! Așteptați aprobarea.');
     } else if (status === 'denied') {
       showView('vDenied');
     } else {
@@ -1923,55 +1895,6 @@ async function stepSendCode() {
   } catch(e) {
     showView('vEmail');
     setErr('errEmail', '⚠ ' + e.message);
-  }
-}
-
-// ── STEP 2: verifica codul OTP ────────────────────────────────────
-async function stepVerifyOtp() {
-  const otp = (document.getElementById('inpOtp').value||'').trim();
-  setErr('errOtp','');
-  if (otp.length !== 6 || !/^\d{6}$/.test(otp)) {
-    setErr('errOtp','Codul trebuie să aibă exact 6 cifre.'); return;
-  }
-  setSpin('Se verifică codul...');
-  try {
-    const res = await apiCall('GET', {
-      action: 'verifyOtp',
-      email:  authUser.email,
-      otp:    otp,
-    });
-    if (res && res.ok && res.verified) {
-      saveSession({ ...authUser, status:'approved' });
-      grantAccess(authUser);
-    } else {
-      showView('vOtp');
-      setErr('errOtp', res?.error || 'Cod incorect sau expirat. Încearcă din nou.');
-    }
-  } catch(e) {
-    showView('vOtp');
-    setErr('errOtp', '⚠ ' + e.message);
-  }
-}
-
-// ── Retrimite cod ─────────────────────────────────────────────────
-async function stepResend() {
-  if (!authUser) { showView('vEmail'); return; }
-  setSpin('Se retrimite codul...');
-  try {
-    const res = await apiCall('GET', {
-      action: 'requestOtp', email: authUser.email, name: authUser.name
-    });
-    if (res && res.otpSent) {
-      document.getElementById('inpOtp').value = '';
-      showView('vOtp');
-      toast('✉ Cod nou trimis pe email!');
-    } else {
-      showView('vOtp');
-      toast('Nu s-a putut retrimite codul.', true);
-    }
-  } catch(e) {
-    showView('vOtp');
-    toast('Eroare: ' + e.message, true);
   }
 }
 
@@ -2002,32 +1925,26 @@ function grantAccess(user) {
   setInterval(silentRecheck, 60 * 1000);
 }
 
-// ── Polling ───────────────────────────────────────────────────────
-function startPoll() {
-  clearInterval(pollTimer); pollSecs = 30; updatePollTxt();
-  pollTimer = setInterval(() => {
-    pollSecs--;
-    updatePollTxt();
-    if (pollSecs <= 0) { clearInterval(pollTimer); pollNow(); }
-  }, 1000);
-}
-function updatePollTxt() {
-  const el = document.getElementById('pollTxt');
-  if (el) el.textContent = pollSecs > 0
-    ? `Se verifică automat în ${pollSecs}s...` : 'Se verifică...';
-}
+// ── Verifică acum — doar checkStatus, nu resetează spreadsheet-ul ─
 async function pollNow() {
   if (!authUser) return;
-  clearInterval(pollTimer);
+  setSpin('Se verifică...');
   try {
-    const res = await apiCall('GET', {
-      action: 'checkStatus', email: authUser.email
-    });
-    if (!res) { startPoll(); return; }
-    if      (res.status === 'approved') { showView('vSpin'); await stepSendCode(); }
-    else if (res.status === 'denied')   { showView('vDenied'); }
-    else                                { startPoll(); }
-  } catch(e) { startPoll(); }
+    const res = await apiCall('GET', { action: 'checkStatus', email: authUser.email });
+    if (!res) { showView('vPending'); toast('Nu s-a putut verifica. Încearcă din nou.', false, true); return; }
+    if (res.status === 'approved' || res.status === 'verified') {
+      saveSession({ ...authUser, status: 'approved' });
+      grantAccess(authUser);
+    } else if (res.status === 'denied') {
+      showView('vDenied');
+    } else {
+      showView('vPending');
+      toast('Accesul nu a fost aprobat încă.', false, true);
+    }
+  } catch(e) {
+    showView('vPending');
+    toast('Eroare la verificare: ' + e.message, true);
+  }
 }
 
 // ── Recheck silentios ─────────────────────────────────────────────
@@ -2045,10 +1962,9 @@ async function silentRecheck() {
 
 // ── Reset form ────────────────────────────────────────────────────
 function resetAuth() {
-  clearInterval(pollTimer);
   document.getElementById('inpEmail').value = '';
   document.getElementById('inpName').value  = '';
-  setErr('errEmail',''); setErr('errOtp','');
+  setErr('errEmail','');
   showView('vEmail');
 }
 
@@ -2163,7 +2079,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         showView('vDenied');   // Acces revocat — afiseaza ecranul denied
         return;
       }
-      if (res && (res.status === 'approved')) {
+      if (res && (res.status === 'approved' || res.status === 'verified')) {
         authUser = s;
         grantAccess(s);        // Status OK — intra in app
         return;
