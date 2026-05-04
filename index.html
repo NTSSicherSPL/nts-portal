@@ -1997,6 +1997,9 @@ function grantAccess(user) {
     loadPendingBadge();
   }
   initApp();
+
+  // Verifică periodic (60s) dacă accesul a fost revocat din spreadsheet
+  setInterval(silentRecheck, 60 * 1000);
 }
 
 // ── Polling ───────────────────────────────────────────────────────
