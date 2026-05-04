@@ -2151,13 +2151,34 @@ function clearSession() {
 }
 
 // ══ ENTRY POINT ═══════════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   const s = loadSession();
   if (s && s.status === 'approved') {
-    authUser = s;
-    grantAccess(s);          // Sesiune valida — direct in app
+    // Verifica statusul REAL din spreadsheet la fiecare pornire
+    // (previne accesul daca adminul a setat 'denied' intre timp)
+    try {
+      const res = await apiCall('GET', { action:'checkStatus', email: s.email });
+      if (res && res.status === 'denied') {
+        clearSession();
+        showView('vDenied');   // Acces revocat — afiseaza ecranul denied
+        return;
+      }
+      if (res && (res.status === 'approved')) {
+        authUser = s;
+        grantAccess(s);        // Status OK — intra in app
+        return;
+      }
+      // Orice alt status (pending, unknown) — forteaza re-login
+      clearSession();
+      showView('vEmail');
+    } catch(e) {
+      // Daca GAS e indisponibil, permite accesul din sesiunea locala
+      // (fail-open pentru a nu bloca userii la probleme de retea temporare)
+      authUser = s;
+      grantAccess(s);
+    }
   } else {
-    showView('vEmail');      // Prima deschidere — ecran email
+    showView('vEmail');        // Prima deschidere — ecran email
   }
 });
 
