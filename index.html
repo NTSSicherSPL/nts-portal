@@ -2051,8 +2051,19 @@ async function adminDecizie(action, email, rowId) {
 }
 
 // ══ SESIUNE ═══════════════════════════════════════════════════════
+// CHECK_INTERVAL: cat timp (ms) intre verificari GAS la pornire
+// 5 minute = 300000ms — daca a fost verificat mai recent, acces instant fara GAS
+const SESS_CHECK_INTERVAL = 5 * 60 * 1000;
+
 function saveSession(d) {
-  try { localStorage.setItem(SESS_KEY, JSON.stringify({...d, _x: Date.now()+SESS_TTL})); } catch(e){}
+  try { localStorage.setItem(SESS_KEY, JSON.stringify({...d, _x: Date.now()+SESS_TTL, _chk: Date.now()})); } catch(e){}
+}
+function touchSessionCheck() {
+  // Actualizeaza doar timestamp-ul ultimei verificari, fara sa rescrie tot
+  try {
+    const s = JSON.parse(localStorage.getItem(SESS_KEY)||'null');
+    if (s) { s._chk = Date.now(); localStorage.setItem(SESS_KEY, JSON.stringify(s)); }
+  } catch(e) {}
 }
 function loadSession() {
   try {
@@ -2070,29 +2081,42 @@ function clearSession() {
 document.addEventListener('DOMContentLoaded', async () => {
   const s = loadSession();
   if (s && s.status === 'approved') {
-    // Verifica statusul REAL din spreadsheet la fiecare pornire
-    // (previne accesul daca adminul a setat 'denied' intre timp)
-    try {
-      const res = await apiCall('GET', { action:'checkStatus', email: s.email });
-      if (res && res.status === 'denied') {
-        clearSession();
-        showView('vDenied');   // Acces revocat — afiseaza ecranul denied
-        return;
-      }
-      if (res && (res.status === 'approved' || res.status === 'verified')) {
-        authUser = s;
-        grantAccess(s);        // Status OK — intra in app
-        return;
-      }
-      // Orice alt status (pending, unknown) — forteaza re-login
-      clearSession();
-      showView('vEmail');
-    } catch(e) {
-      // Daca GAS e indisponibil, permite accesul din sesiunea locala
-      // (fail-open pentru a nu bloca userii la probleme de retea temporare)
-      authUser = s;
-      grantAccess(s);
+    // ── ACCES INSTANT din sesiunea locala ────────────────────────
+    // Nu blocam userul sa astepte GAS-ul. Acordam accesul imediat,
+    // apoi verificam in fundal daca adminul a revocat accesul.
+    authUser = s;
+    grantAccess(s);
+
+    // ── Verificare in fundal (nu blocheaza UI) ───────────────────
+    // Daca a trecut mai putin de SESS_CHECK_INTERVAL de la ultima
+    // verificare reusita, sarim GAS-ul complet (acces instant pur).
+    const lastCheck = s._chk || 0;
+    const elapsed   = Date.now() - lastCheck;
+
+    if (elapsed > SESS_CHECK_INTERVAL) {
+      // Verificare silentioasa in fundal — nu asteapta, nu blocheaza
+      (async () => {
+        try {
+          const res = await apiCall('GET', { action:'checkStatus', email: s.email });
+          if (res && res.status === 'denied') {
+            clearSession();
+            toast('⛔ Accesul tău a fost revocat de admin.', true);
+            setTimeout(() => location.reload(), 2000);
+            return;
+          }
+          if (res && (res.status === 'approved' || res.status === 'verified')) {
+            // OK — actualizam doar timestamp-ul verificarii
+            touchSessionCheck();
+          }
+          // Daca status e unknown/pending dar avem sesiune salvata, mentinem accesul
+          // (fail-open: daca GAS are probleme nu blocam userul)
+        } catch(e) {
+          // GAS indisponibil — mentinem accesul din sesiunea locala (fail-open)
+          console.warn('NTS: verificare fundal esuata (GAS indisponibil)', e.message);
+        }
+      })();
     }
+    // Daca elapsed <= SESS_CHECK_INTERVAL: zero apeluri GAS — acces instant pur
   } else {
     showView('vEmail');        // Prima deschidere — ecran email
   }
