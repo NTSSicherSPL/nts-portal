@@ -1370,9 +1370,10 @@ function planDataToHtml(name, rows, styles) {
       else if (lo==='nefinalizat'||lo==='nu'||lo==='no') color = 'color:var(--red);font-weight:600;';
       else if (/^[A-Z]{2}\d{3,}/.test(s)||/^\d{7,}$/.test(s)) color = 'color:var(--gold);font-weight:600;';
 
+      const sHtml = s.replace(/\n/g, '<br>');
       const st = `padding:5px 8px;border-bottom:1px solid rgba(26,48,80,.4);
-        vertical-align:top;line-height:1.3;white-space:pre-line;${color}${fw}${fi}${fz}`;
-      return `<td style="${st}">${s || '—'}</td>`;
+        vertical-align:top;line-height:1.3;white-space:nowrap;${color}${fw}${fi}${fz}`;
+      return `<td style="${st}">${sHtml || '—'}</td>`;
     }).join('');
     const bg = ri%2!==0 ? 'background:rgba(0,170,255,.02);' : '';
     return `<tr style="${bg}">${tds}</tr>`;
