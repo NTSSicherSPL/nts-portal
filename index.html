@@ -1371,7 +1371,7 @@ function planDataToHtml(name, rows, styles) {
       else if (/^[A-Z]{2}\d{3,}/.test(s)||/^\d{7,}$/.test(s)) color = 'color:var(--gold);font-weight:600;';
 
       const st = `padding:8px 10px;border-bottom:1px solid rgba(26,48,80,.4);
-        vertical-align:top;${color}${fw}${fi}${fz}`;
+        vertical-align:middle;white-space:nowrap;${color}${fw}${fi}${fz}`;
       return `<td style="${st}">${s || '—'}</td>`;
     }).join('');
     const bg = ri%2!==0 ? 'background:rgba(0,170,255,.02);' : '';
