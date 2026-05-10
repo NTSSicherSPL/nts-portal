@@ -661,10 +661,6 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
           <label>Numele tău</label>
           <select id="rqName">
             <option value="">— Selectează —</option>
-            <option>Alexandru Lungu</option><option>Adrian Talas</option>
-            <option>Ramon Stefana</option><option>Cosmin Bizineche</option>
-            <option>Liviu Chelciov</option><option>Nicolas Blaga</option>
-            <option>Silviu Gaitan</option><option>Sergiu Bîlcu</option>
           </select>
         </div>
         <div class="full">
@@ -743,14 +739,6 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
         <div><label>Tehnician</label>
           <select id="fTech" onchange="renderP()">
             <option value="">Toți</option>
-            <option value="Alexandru Lungu" data-team="Echipa 1">Alexandru Lungu</option>
-            <option value="Adrian Talas"     data-team="Echipa 1">Adrian Talas</option>
-            <option value="Ramon Stefana"    data-team="Echipa 2">Ramon Stefana</option>
-            <option value="Cosmin Bizineche" data-team="Echipa 2">Cosmin Bizineche</option>
-            <option value="Liviu Chelciov"   data-team="Echipa 3">Liviu Chelciov</option>
-            <option value="Nicolas Blaga"    data-team="Echipa 3">Nicolas Blaga</option>
-            <option value="Silviu Gaitan"     data-team="Echipa 4">Silviu Gaitan</option>
-            <option value="Sergiu Bîlcu"     data-team="Echipa 4">Sergiu Bîlcu</option>
           </select>
         </div>
       </div>
@@ -803,7 +791,8 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
 const EMAIL_TO = 'contabilitate@networkticketsolution.com';
 const API_URL = 'https://script.google.com/macros/s/AKfycbxs6GcfmqqFyyAARKFhz46ObpqK-r61NXls8jt9YMdrGuS_i8aFtvMszbpOH2szOe4b/exec';
 
-const TECHS = [
+// TECHS — fallback hardcodat. Suprascris dinamic din sheet-ul "Tehnicieni" (vezi applyTehnicieniFromSheet)
+let TECHS = [
   {name:'Alexandru Lungu', ini:'AL', team:'Echipa 1', pri:true},
   {name:'Adrian Talas',    ini:'AT', team:'Echipa 1', pri:false},
   {name:'Ramon Stefana',   ini:'RS', team:'Echipa 2', pri:true},
@@ -834,6 +823,7 @@ function initApp() {
   const now = new Date();
   document.getElementById('reportDate').value = now.toISOString().split('T')[0];
   buildTech(); buildPills(); buildMonths();
+  buildTechDropdowns();
   syncAll(); injectMF();
   setInterval(() => syncAll(true), 90 * 1000); // 90 secunde
   setInterval(() => silentRecheck(), 30 * 60 * 1000);
@@ -862,6 +852,10 @@ async function syncAll(silent=false) {
     if(res && res.ok) {
       gData = res.data;
       console.log('[NTS] certificari din Sheets:', JSON.stringify(gData.certificari));
+      // Aplică lista de tehnicieni din sheet (dacă există) — altfel rămâne fallback-ul hardcodat
+      if (gData.tehnicieni && gData.tehnicieni.length) {
+        applyTehnicieniFromSheet(gData.tehnicieni);
+      }
       // Pastreaza PLAN_URL_DEFAULT daca GSheets nu are un plan_url setat
       if (!gData.plan_url) gData.plan_url = PLAN_URL_DEFAULT;
       // Push rapoartele locale nesincronizate dacă există
@@ -1016,6 +1010,90 @@ function buildPills() {
     };
     c.appendChild(s);
   });
+}
+
+// ╔══════════════════════════════════════════╗
+// ║  TEHNICIENI — populare dinamică          ║
+// ║  din sheet-ul "Tehnicieni" (NTS Portal)  ║
+// ╚══════════════════════════════════════════╝
+
+// Populează cele 2 dropdown-uri (Solicitări → "Numele tău", Pontaj → "Tehnician")
+// pe baza TECHS curent. Păstrează option-ul placeholder existent.
+function buildTechDropdowns() {
+  // rqName — dropdown la pagina "Solicitări"
+  const rqSel = document.getElementById('rqName');
+  if (rqSel) {
+    const ph = rqSel.querySelector('option[value=""]');
+    rqSel.innerHTML = '';
+    if (ph) rqSel.appendChild(ph);
+    else { const o=document.createElement('option'); o.value=''; o.textContent='— Selectează —'; rqSel.appendChild(o); }
+    TECHS.forEach(t => {
+      const o = document.createElement('option');
+      o.value = t.name; o.textContent = t.name;
+      rqSel.appendChild(o);
+    });
+  }
+  // fTech — dropdown la pagina "Pontaj"
+  const ftSel = document.getElementById('fTech');
+  if (ftSel) {
+    const ph = ftSel.querySelector('option[value=""]');
+    ftSel.innerHTML = '';
+    if (ph) ftSel.appendChild(ph);
+    else { const o=document.createElement('option'); o.value=''; o.textContent='Toți'; ftSel.appendChild(o); }
+    TECHS.forEach(t => {
+      const o = document.createElement('option');
+      o.value = t.name; o.textContent = t.name;
+      o.setAttribute('data-team', t.team);
+      ftSel.appendChild(o);
+    });
+  }
+}
+
+// Recalculează TEAM_MEMBERS din TECHS — păstrează ordinea: titularul (pri:true) primul
+function recomputeTeamMembers() {
+  const m = {};
+  TECHS.forEach(t => {
+    if (!m[t.team]) m[t.team] = [];
+    if (t.pri) m[t.team].unshift(t.name);
+    else       m[t.team].push(t.name);
+  });
+  TEAM_MEMBERS = m;
+}
+
+// Reconstruiește complet UI-ul tehnicienilor (grila + dropdown-urile)
+// Apelată după ce sosesc date noi din sheet
+function rebuildTechUI() {
+  // 1. Curăță selecțiile curente (pot conține nume care nu mai există în noua listă)
+  selTechs = new Set();
+  const seltField = document.getElementById('selTechs');
+  if (seltField) seltField.value = '';
+  // 2. Curăță grila și o reconstruiește
+  const g = document.getElementById('techGrid');
+  if (g) g.innerHTML = '';
+  buildTech();
+  // 3. Repopulează dropdown-urile
+  buildTechDropdowns();
+  // 4. Recompune mapping-ul echipă→membri
+  recomputeTeamMembers();
+}
+
+// Aplică lista de tehnicieni primită din sheet. Validează minim și ignoră entries invalide.
+// Dacă lista e goală sau invalidă, păstrează TECHS curent (fallback).
+function applyTehnicieniFromSheet(list) {
+  if (!Array.isArray(list) || list.length === 0) return false;
+  const cleaned = list
+    .filter(t => t && typeof t === 'object' && t.name && t.team)
+    .map(t => ({
+      name: String(t.name).trim(),
+      team: String(t.team).trim(),
+      ini:  String(t.ini || '').trim() ||
+            String(t.name).trim().split(/\s+/).map(p => p[0]||'').join('').substring(0,2).toUpperCase(),
+      pri:  !!t.pri
+    }));
+  if (cleaned.length === 0) return false;
+  TECHS = cleaned;
+  rebuildTechUI();
+  return true;
 }
 
 function togT(el,name,tn,isPri) {
@@ -1583,8 +1661,8 @@ function buildMonths() {
   sel.value=cur;
 }
 
-// Team → members map for filtering
-const TEAM_MEMBERS = {
+// Team → members map for filtering. Recompusă din TECHS la fiecare apply (recomputeTeamMembers)
+let TEAM_MEMBERS = {
   'Echipa 1': ['Alexandru Lungu','Adrian Talas'],
   'Echipa 2': ['Ramon Stefana','Cosmin Bizineche'],
   'Echipa 3': ['Liviu Chelciov','Nicolas Blaga'],
