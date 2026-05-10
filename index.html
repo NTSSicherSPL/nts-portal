@@ -807,7 +807,7 @@ const WORK_TYPES = ['Swap','Preinstall','Clean-up','Install','Activități Anexe
 // ── PONTAJ — utilizatori cu acces complet (văd toate echipele) ──
 // Adminul are deja acces complet automat (prin authUser.isAdmin).
 // Adaugă aici nume care, deși nu sunt admin, trebuie să vadă toată activitatea.
-const PONTAJ_FULL_ACCESS = ['Alin Spulbatu'];
+const PONTAJ_FULL_ACCESS = ['Alin Spulbatu', 'Cristina Cosari'];
 
 // State
 let selTechs=new Set(), selWork=null, stVal=null, dp=null;
@@ -1735,12 +1735,16 @@ function filterByPontajPermissions(rapoarte) {
   });
 }
 
-// Restricționează UI-ul (dropdown-urile) pentru utilizatorii fără acces complet
+// Restrictie UI Pontaj pentru utilizatorii fara acces complet
+// Reguli:
+//  - Filtrul de echipa se blocheaza pe echipa lui (UI)
+//  - Datele arata totusi si rapoartele unde apare personal la alta echipa (prin filterByPontajPermissions)
+//  - Filtrul de tehnician se limiteaza la membrii echipei proprii
 function applyPontajPermissionsUI() {
-  if (canSeeAllPontaj()) return; // privilegiați — fără restricții vizuale
+  if (canSeeAllPontaj()) return;
   const myTeam = getMyTeam();
-  if (!myTeam) return; // dacă nu e tehnician (ex: cineva nou nelistat), lasă UI-ul așa cum e
-  // 1. Lock team filter pe echipa lui
+  if (!myTeam) return;
+  // 1. Blocheaza filtrul de echipa pe echipa lui
   const fTeam = document.getElementById('fTeam');
   if (fTeam) {
     [...fTeam.options].forEach(opt => {
@@ -1751,12 +1755,12 @@ function applyPontajPermissionsUI() {
     fTeam.style.opacity = '0.6';
     fTeam.style.cursor = 'not-allowed';
   }
-  // 2. Limitează tech filter la membrii echipei lui
+  // 2. Limiteaza tech filter la membrii echipei lui
   const fTech = document.getElementById('fTech');
   if (fTech) {
     const teamMembers = TEAM_MEMBERS[myTeam] || [];
     [...fTech.options].forEach(opt => {
-      if (!opt.value) return; // păstrează "Toți"
+      if (!opt.value) return; // pastreaza "Toti"
       if (!teamMembers.includes(opt.value)) opt.remove();
     });
   }
@@ -1768,13 +1772,18 @@ function renderP() {
   const tf = document.getElementById('fTech').value;
   const tm = document.getElementById('fTeam').value;
 
+  const myName = (!canSeeAllPontaj() && authUser?.name) ? authUser.name.trim() : '';
+
   let data = rapoarte.filter(r => {
     const ds = getDateStr(r.data);
     if (mf && !ds.startsWith(mf)) return false;
     if (tf && !r.technicieni?.includes(tf)) return false;
     if (tm) {
       const members = TEAM_MEMBERS[tm] || [];
-      if (!members.some(m => (r.technicieni||'').includes(m))) return false;
+      const inTeam = members.some(m => (r.technicieni||'').includes(m));
+      // Daca nu e in echipa filtrata, arata totusi randul daca apare personal (alta echipa)
+      const appearsPersonally = myName && (r.technicieni||'').includes(myName);
+      if (!inTeam && !appearsPersonally) return false;
     }
     return true;
   }).sort((a,b) => (getDateStr(b.data)||'').localeCompare(getDateStr(a.data)||''));
