@@ -804,6 +804,11 @@ let TECHS = [
 ];
 const WORK_TYPES = ['Swap','Preinstall','Clean-up','Install','Activități Anexe'];
 
+// ── PONTAJ — utilizatori cu acces complet (văd toate echipele) ──
+// Adminul are deja acces complet automat (prin authUser.isAdmin).
+// Adaugă aici nume care, deși nu sunt admin, trebuie să vadă toată activitatea.
+const PONTAJ_FULL_ACCESS = ['Alin Spulbatu'];
+
 // State
 let selTechs=new Set(), selWork=null, stVal=null, dp=null;
 let gData = { rapoarte:[], plan_url:'https://docs.google.com/spreadsheets/d/e/2PACX-1vRLEHiuD5sC3CtFx_vlHt9Cdg0q-XmmyQekp2-AUoysdUqVSMAFAzf8Xo4k337GYw/pubhtml', pontaj_url:'', certificari:{} };
@@ -1047,6 +1052,8 @@ function buildTechDropdowns() {
       ftSel.appendChild(o);
     });
   }
+  // Aplică restricțiile de vizibilitate Pontaj (dacă utilizatorul nu e privilegiat)
+  applyPontajPermissionsUI();
 }
 
 // Recalculează TEAM_MEMBERS din TECHS — păstrează ordinea: titularul (pri:true) primul
@@ -1690,8 +1697,73 @@ function getTeamForTech(techName) {
   return '—';
 }
 
+// ── Permisiuni Pontaj ────────────────────────────────────────────
+// Reguli:
+//  • Admin (după email) → vede tot
+//  • Nume din PONTAJ_FULL_ACCESS → văd tot (ex: Alin Spulbatu)
+//  • Restul → văd doar rapoartele echipei lor + cele unde apar personal
+function canSeeAllPontaj() {
+  if (!authUser) return false;
+  if (authUser.isAdmin) return true;
+  const n = (authUser.name||'').trim().toLowerCase();
+  if (!n) return false;
+  return PONTAJ_FULL_ACCESS.some(name => {
+    const target = name.trim().toLowerCase();
+    return n === target || n.includes(target) || target.includes(n);
+  });
+}
+
+function getMyTeam() {
+  if (!authUser || !authUser.name) return null;
+  const t = getTeamForTech(authUser.name);
+  return (t && t !== '—') ? t : null;
+}
+
+// Aplică filtrul de permisiuni peste lista de rapoarte (înainte de filtrele UI)
+function filterByPontajPermissions(rapoarte) {
+  if (canSeeAllPontaj()) return rapoarte;
+  const myName = (authUser?.name || '').trim();
+  const myTeam = getMyTeam();
+  const myTeamMembers = myTeam ? (TEAM_MEMBERS[myTeam] || []) : [];
+  return rapoarte.filter(r => {
+    const techStr = String(r.technicieni||'');
+    // Văd rapoartele unde apar personal
+    if (myName && techStr.includes(myName)) return true;
+    // Văd rapoartele echipei mele (chiar dacă eu n-am fost prezent)
+    if (myTeamMembers.length && myTeamMembers.some(m => techStr.includes(m))) return true;
+    return false;
+  });
+}
+
+// Restricționează UI-ul (dropdown-urile) pentru utilizatorii fără acces complet
+function applyPontajPermissionsUI() {
+  if (canSeeAllPontaj()) return; // privilegiați — fără restricții vizuale
+  const myTeam = getMyTeam();
+  if (!myTeam) return; // dacă nu e tehnician (ex: cineva nou nelistat), lasă UI-ul așa cum e
+  // 1. Lock team filter pe echipa lui
+  const fTeam = document.getElementById('fTeam');
+  if (fTeam) {
+    [...fTeam.options].forEach(opt => {
+      if (opt.value && opt.value !== myTeam) opt.remove();
+    });
+    fTeam.value = myTeam;
+    fTeam.disabled = true;
+    fTeam.style.opacity = '0.6';
+    fTeam.style.cursor = 'not-allowed';
+  }
+  // 2. Limitează tech filter la membrii echipei lui
+  const fTech = document.getElementById('fTech');
+  if (fTech) {
+    const teamMembers = TEAM_MEMBERS[myTeam] || [];
+    [...fTech.options].forEach(opt => {
+      if (!opt.value) return; // păstrează "Toți"
+      if (!teamMembers.includes(opt.value)) opt.remove();
+    });
+  }
+}
+
 function renderP() {
-  const rapoarte = gData.rapoarte || [];
+  const rapoarte = filterByPontajPermissions(gData.rapoarte || []);
   const mf = document.getElementById('fMonth').value;
   const tf = document.getElementById('fTech').value;
   const tm = document.getElementById('fTeam').value;
