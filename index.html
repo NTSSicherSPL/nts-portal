@@ -910,10 +910,11 @@ let TECHS = [
 ];
 const WORK_TYPES = ['Swap','Preinstall','Clean-up','Install','Activități Anexe'];
 
-// ── PONTAJ — utilizatori cu acces complet (văd toate echipele) ──
+// ── PONTAJ — utilizatori cu acces complet (văd toate echipele și toți tehnicienii) ──
 // Adminul are deja acces complet automat (prin authUser.isAdmin).
 // Adaugă aici nume care, deși nu sunt admin, trebuie să vadă toată activitatea.
-const PONTAJ_FULL_ACCESS = ['Alin Spulbatu', 'Cristina Cosari'];
+// Toți ceilalți tehnicieni văd DOAR rapoartele în care apare NUMELE LOR.
+const PONTAJ_FULL_ACCESS = ['Alin Spulbatu', 'Cristina'];
 
 // State
 let selTechs=new Set(), selWork=null, stVal=null, dp=null;
@@ -982,6 +983,9 @@ async function syncAll(silent=false) {
       }
       buildMonths();
       renderP();
+      // Re-aplică permisiunile UI pontaj după ce datele din sheet au sosit
+      // (lista de tehnicieni poate fi actualizată din sheet)
+      applyPontajPermissionsUI();
       // planSheets vine deja din getData — aplica direct fara apel separat
       if (gData.planSheets && gData.planSheets.length) {
         PLAN_SHEET_NAMES = gData.planSheets.map(s => (s.name||s).toUpperCase()).filter(n => /^KW\d{2}$/i.test(n)).sort();
@@ -1143,6 +1147,12 @@ function buildTechDropdowns() {
       o.value = t.name; o.textContent = t.name;
       rqSel.appendChild(o);
     });
+    // Pre-selecteaza automat numele utilizatorului autentificat
+    if (authUser && authUser.name) {
+      const myName = authUser.name.trim();
+      const match = [...rqSel.options].find(o => o.value === myName);
+      if (match) rqSel.value = myName;
+    }
   }
   // fTech — dropdown la pagina "Pontaj"
   const ftSel = document.getElementById('fTech');
@@ -1184,10 +1194,11 @@ function rebuildTechUI() {
   const g = document.getElementById('techGrid');
   if (g) g.innerHTML = '';
   buildTech();
-  // 3. Repopulează dropdown-urile
-  buildTechDropdowns();
-  // 4. Recompune mapping-ul echipă→membri
+  // 3. Recompune mapping-ul echipă→membri ÎNAINTE de dropdown-uri
+  //    (applyPontajPermissionsUI din buildTechDropdowns are nevoie de TEAM_MEMBERS actualizat)
   recomputeTeamMembers();
+  // 4. Repopulează dropdown-urile (include applyPontajPermissionsUI)
+  buildTechDropdowns();
 }
 
 // Aplică lista de tehnicieni primită din sheet. Validează minim și ignoră entries invalide.
@@ -1826,49 +1837,54 @@ function getMyTeam() {
 }
 
 // Aplică filtrul de permisiuni peste lista de rapoarte (înainte de filtrele UI)
+// Utilizatorii obișnuiți văd DOAR rapoartele unde apar personal cu numele lor
 function filterByPontajPermissions(rapoarte) {
   if (canSeeAllPontaj()) return rapoarte;
   const myName = (authUser?.name || '').trim();
-  const myTeam = getMyTeam();
-  const myTeamMembers = myTeam ? (TEAM_MEMBERS[myTeam] || []) : [];
+  if (!myName) return [];
   return rapoarte.filter(r => {
     const techStr = String(r.technicieni||'');
-    // Văd rapoartele unde apar personal
-    if (myName && techStr.includes(myName)) return true;
-    // Văd rapoartele echipei mele (chiar dacă eu n-am fost prezent)
-    if (myTeamMembers.length && myTeamMembers.some(m => techStr.includes(m))) return true;
-    return false;
+    // Văd DOAR rapoartele unde apar personal cu numele meu
+    return techStr.includes(myName);
   });
 }
 
 // Restrictie UI Pontaj pentru utilizatorii fara acces complet
 // Reguli:
 //  - Filtrul de echipa se blocheaza pe echipa lui (UI)
-//  - Datele arata totusi si rapoartele unde apare personal la alta echipa (prin filterByPontajPermissions)
-//  - Filtrul de tehnician se limiteaza la membrii echipei proprii
+//  - Filtrul de tehnician se limiteaza la numele lui propriu (vede doar rapoartele lui)
+//  - Exceptii cu acces complet: PONTAJ_FULL_ACCESS si admin
 function applyPontajPermissionsUI() {
   if (canSeeAllPontaj()) return;
   const myTeam = getMyTeam();
-  if (!myTeam) return;
+  const myName = (authUser?.name || '').trim();
+
   // 1. Blocheaza filtrul de echipa pe echipa lui
   const fTeam = document.getElementById('fTeam');
   if (fTeam) {
     [...fTeam.options].forEach(opt => {
       if (opt.value && opt.value !== myTeam) opt.remove();
     });
-    fTeam.value = myTeam;
-    fTeam.disabled = true;
-    fTeam.style.opacity = '0.6';
-    fTeam.style.cursor = 'not-allowed';
+    if (myTeam) {
+      fTeam.value = myTeam;
+      fTeam.disabled = true;
+      fTeam.style.opacity = '0.6';
+      fTeam.style.cursor = 'not-allowed';
+    }
   }
-  // 2. Limiteaza tech filter la membrii echipei lui
+
+  // 2. Limiteaza tech filter la DOAR numele propriu
   const fTech = document.getElementById('fTech');
-  if (fTech) {
-    const teamMembers = TEAM_MEMBERS[myTeam] || [];
+  if (fTech && myName) {
     [...fTech.options].forEach(opt => {
-      if (!opt.value) return; // pastreaza "Toti"
-      if (!teamMembers.includes(opt.value)) opt.remove();
+      if (!opt.value) return; // pastreaza "Toti" (va afisa rapoartele proprii)
+      if (opt.value !== myName) opt.remove();
     });
+    // Pre-selecteaza automat numele propriu
+    fTech.value = myName;
+    fTech.disabled = true;
+    fTech.style.opacity = '0.6';
+    fTech.style.cursor = 'not-allowed';
   }
 }
 
@@ -1878,18 +1894,18 @@ function renderP() {
   const tf = document.getElementById('fTech').value;
   const tm = document.getElementById('fTeam').value;
 
-  const myName = (!canSeeAllPontaj() && authUser?.name) ? authUser.name.trim() : '';
+  const fullAccess = canSeeAllPontaj();
 
   let data = rapoarte.filter(r => {
     const ds = getDateStr(r.data);
     if (mf && !ds.startsWith(mf)) return false;
     if (tf && !r.technicieni?.includes(tf)) return false;
-    if (tm) {
+    // Filtrul de echipa se aplica DOAR utilizatorilor cu acces complet
+    // Utilizatorii normali vad deja doar rapoartele lor (din filterByPontajPermissions)
+    if (fullAccess && tm) {
       const members = TEAM_MEMBERS[tm] || [];
       const inTeam = members.some(m => (r.technicieni||'').includes(m));
-      // Daca nu e in echipa filtrata, arata totusi randul daca apare personal (alta echipa)
-      const appearsPersonally = myName && (r.technicieni||'').includes(myName);
-      if (!inTeam && !appearsPersonally) return false;
+      if (!inTeam) return false;
     }
     return true;
   }).sort((a,b) => (getDateStr(b.data)||'').localeCompare(getDateStr(a.data)||''));
@@ -2090,11 +2106,21 @@ if('serviceWorker' in navigator){
       }
     });
   `;
-  const swBlob = new Blob([swCode], {type:'application/javascript'});
-  const swUrl = URL.createObjectURL(swBlob);
-  navigator.serviceWorker.register(swUrl)
-    .then(() => console.log('NTS SW registered'))
-    .catch(e => console.warn('SW reg failed:', e));
+  // ServiceWorker nu accepta blob: URL — folosim inline via <script> tag intr-un Worker
+  // Sau, daca pagina e servita de pe HTTPS/localhost, inregistram direct un SW inline
+  try {
+    const swB64 = btoa(unescape(encodeURIComponent(swCode)));
+    const swDataUrl = 'data:application/javascript;base64,' + swB64;
+    navigator.serviceWorker.register(swDataUrl, {scope: './'})
+      .then(() => console.log('NTS SW registered'))
+      .catch(() => {
+        // data: URL nu e suportat in toate browserele pentru SW (ex: Chrome restrictionat)
+        // Silentiem eroarea — aplicatia functioneaza fara SW
+        console.info('NTS: SW offline cache indisponibil in acest context (normal pentru fisiere locale)');
+      });
+  } catch(e) {
+    console.info('NTS: SW not available:', e.message);
+  }
 }
 
 // ╔════════════════════════════════════════════════════════════════╗
@@ -2186,6 +2212,14 @@ function grantAccess(user) {
     loadPendingBadge();
   }
   initApp();
+
+  // Aplică permisiunile de pontaj după ce authUser e setat și UI-ul e construit
+  // (applyPontajPermissionsUI din initApp rulează la buildTechDropdowns, înainte de syncAll)
+  // Re-aplicăm după syncAll pentru a prinde și lista dinamică din sheet
+  setTimeout(() => {
+    applyPontajPermissionsUI();
+    renderP();
+  }, 200);
 
   // Verifică periodic (60s) dacă accesul a fost revocat din spreadsheet
   setInterval(silentRecheck, 60 * 1000);
