@@ -879,9 +879,19 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbxs6GcfmqqFyyAARKFhz46O
 // ╔══════════════════════════════════════════╗
 // ║  NAS SYNOLOGY                            ║
 // ╚══════════════════════════════════════════╝
-const NAS_USER = 'Field';
-const NAS_PASS = 'NTSTeamWork2026!';
+let NAS_USER = 'Field';
+let NAS_PASS = 'TEAMNtSWork2026!';
 let nasPassVisible = false;
+
+// Aplica credentialele NAS din Google Sheets (tab Config)
+function applyNasCredsFromSheet(data) {
+  if (data.nas_user) NAS_USER = data.nas_user;
+  if (data.nas_pass) NAS_PASS = data.nas_pass;
+  const userDisp = document.getElementById('nasUserDisp');
+  if (userDisp) userDisp.textContent = NAS_USER;
+  const disp = document.getElementById('nasPassDisp');
+  if (disp) disp.textContent = nasPassVisible ? NAS_PASS : '••••••••••••••';
+}
 
 function toggleNasPass() {
   nasPassVisible = !nasPassVisible;
@@ -979,6 +989,8 @@ async function syncAll(silent=false) {
       if (gData.tehnicieni && gData.tehnicieni.length) {
         applyTehnicieniFromSheet(gData.tehnicieni);
       }
+      // Aplica credentialele NAS din tab-ul Config
+      applyNasCredsFromSheet(gData);
       // Pastreaza PLAN_URL_DEFAULT daca GSheets nu are un plan_url setat
       if (!gData.plan_url) gData.plan_url = PLAN_URL_DEFAULT;
       // Push rapoartele locale nesincronizate dacă există
