@@ -800,7 +800,18 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
     <div class="card">
       <div class="ct">🔍 &nbsp;Pontaj Echipe</div>
       <div class="p-controls">
-        <div><label>Luna</label><select id="fMonth" onchange="renderP()"><option value="">Toate lunile</option></select></div>
+        <div>
+          <label>Luna</label>
+          <div style="display:flex;align-items:center;gap:5px;">
+            <button id="monthBtnPrev" onclick="monthNav(1)" title="Luna anterioară"
+              style="flex-shrink:0;width:32px;height:36px;background:var(--card);border:1px solid var(--b2);border-radius:6px;color:var(--accent);font-size:1.2rem;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:opacity .2s;">&#8249;</button>
+            <select id="fMonth" onchange="(function(){var r=gData.rapoarte||[];var m=[...new Set(r.map(x=>getDateStr(x.data).slice(0,7)))].filter(Boolean).sort().reverse();updateMonthNavBtns(m);renderP();})()">
+              <option value="">Toate lunile</option>
+            </select>
+            <button id="monthBtnNext" onclick="monthNav(-1)" title="Luna următoare"
+              style="flex-shrink:0;width:32px;height:36px;background:var(--card);border:1px solid var(--b2);border-radius:6px;color:var(--accent);font-size:1.2rem;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:opacity .2s;">&#8250;</button>
+          </div>
+        </div>
         <div><label>Echipa</label>
           <select id="fTeam" onchange="syncTeamFilter()">
             <option value="">Toate echipele</option>
@@ -1774,15 +1785,57 @@ function buildMonths() {
   const rapoarte = gData.rapoarte || [];
   const sel = document.getElementById('fMonth');
   const months=[...new Set(rapoarte.map(r=>getDateStr(r.data).slice(0,7)))].filter(Boolean).sort().reverse();
-  const cur=sel.value;
-  sel.innerHTML='<option value="">Toate lunile</option>';
+  const prevVal = sel.value;
+
+  sel.innerHTML='';
+  if (!months.length) {
+    const o=document.createElement('option'); o.value=''; o.textContent='--- Nicio data ---';
+    sel.appendChild(o);
+    updateMonthNavBtns(months);
+    return;
+  }
   months.forEach(m=>{
     const o=document.createElement('option'); o.value=m;
     const[y,mo]=m.split('-');
     o.textContent=new Date(y,mo-1).toLocaleDateString('ro-RO',{month:'long',year:'numeric'});
     sel.appendChild(o);
   });
-  sel.value=cur;
+
+  if (prevVal && months.includes(prevVal)) {
+    sel.value = prevVal;
+  } else {
+    const now = new Date();
+    const curMonth = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+    sel.value = months.includes(curMonth) ? curMonth : months[0];
+  }
+  updateMonthNavBtns(months);
+}
+
+function updateMonthNavBtns(months) {
+  const sel = document.getElementById('fMonth');
+  const btnPrev = document.getElementById('monthBtnPrev');
+  const btnNext = document.getElementById('monthBtnNext');
+  if (!btnPrev || !btnNext || !months.length) return;
+  const idx = months.indexOf(sel.value);
+  // months sortat descrescator: idx=0 = cea mai recenta, idx=last = cea mai veche
+  btnNext.style.opacity = (idx <= 0) ? '0.3' : '1';
+  btnNext.style.pointerEvents = (idx <= 0) ? 'none' : '';
+  btnPrev.style.opacity = (idx >= months.length-1) ? '0.3' : '1';
+  btnPrev.style.pointerEvents = (idx >= months.length-1) ? 'none' : '';
+}
+
+function monthNav(dir) {
+  const sel = document.getElementById('fMonth');
+  const rapoarte = gData.rapoarte || [];
+  const months=[...new Set(rapoarte.map(r=>getDateStr(r.data).slice(0,7)))].filter(Boolean).sort().reverse();
+  if (!months.length) return;
+  const idx = months.indexOf(sel.value);
+  const newIdx = idx + dir;
+  if (newIdx >= 0 && newIdx < months.length) {
+    sel.value = months[newIdx];
+    updateMonthNavBtns(months);
+    renderP();
+  }
 }
 
 // Team → members map for filtering. Recompusă din TECHS la fiecare apply (recomputeTeamMembers)
@@ -1898,7 +1951,7 @@ function renderP() {
 
   let data = rapoarte.filter(r => {
     const ds = getDateStr(r.data);
-    if (mf && !ds.startsWith(mf)) return false;
+    if (!mf || !ds.startsWith(mf)) return false;
     if (tf && !r.technicieni?.includes(tf)) return false;
     // Filtrul de echipa se aplica DOAR utilizatorilor cu acces complet
     // Utilizatorii normali vad deja doar rapoartele lor (din filterByPontajPermissions)
