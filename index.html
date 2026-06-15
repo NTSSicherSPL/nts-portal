@@ -431,6 +431,36 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
   cursor:pointer;transition:all .2s;}
 .btn-no:hover{background:rgba(255,68,85,.1);}
 
+/* ══ MESAJ TEHNICIAN — clopoțel + modal ══ */
+.msg-chip{display:none;align-items:center;justify-content:center;
+  background:rgba(0,170,255,.08);border:1px solid rgba(0,170,255,.28);
+  border-radius:20px;width:30px;height:24px;font-size:.85rem;
+  flex-shrink:0;cursor:pointer;transition:all .2s;position:relative;}
+.msg-chip:hover{background:rgba(0,170,255,.16);border-color:var(--accent);}
+.msg-chip.has-msg{animation:pulse 1.4s infinite;}
+.msg-bdg{position:absolute;top:-5px;right:-5px;width:15px;height:15px;
+  border-radius:50%;background:var(--red);color:#fff;font-size:.6rem;
+  font-weight:700;display:none;align-items:center;justify-content:center;}
+#msgPanel{position:fixed;inset:0;z-index:8500;background:rgba(7,17,31,.92);
+  display:flex;align-items:flex-end;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .25s;}
+#msgPanel.open{opacity:1;pointer-events:all;}
+.msg-box{background:var(--card);border:1px solid var(--accent);
+  border-radius:16px 16px 0 0;padding:20px 16px 36px;
+  width:100%;max-width:520px;
+  transform:translateY(50px);transition:transform .28s cubic-bezier(.17,.67,.4,1.1);}
+#msgPanel.open .msg-box{transform:translateY(0);}
+.msg-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.msg-ttl{font-family:'Rajdhani',sans-serif;font-size:1.1rem;font-weight:700;
+  letter-spacing:.07em;color:var(--accent);}
+.msg-cls{background:transparent;border:1px solid var(--b2);border-radius:6px;
+  color:var(--dim);padding:5px 11px;cursor:pointer;font-size:.78rem;transition:all .2s;}
+.msg-cls:hover{border-color:var(--red);color:var(--red);}
+.msg-body{background:var(--inp);border:1px solid var(--b);border-radius:9px;
+  padding:14px 14px;font-size:.92rem;line-height:1.6;color:var(--text);
+  white-space:pre-wrap;word-break:break-word;}
+.msg-empty{text-align:center;padding:28px;color:var(--dim);font-size:.79rem;}
+
 </style>
 </head>
 <body>
@@ -495,6 +525,17 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
   </div>
 </div>
 
+<!-- ══ MESAJ PANEL ══ -->
+<div id="msgPanel">
+  <div class="msg-box">
+    <div class="msg-hdr">
+      <div class="msg-ttl">✉️ Mesaj pentru tine</div>
+      <button class="msg-cls" onclick="closeMsgPanel()">✕ Închide</button>
+    </div>
+    <div id="msgBody"><div class="msg-empty">Niciun mesaj.</div></div>
+  </div>
+</div>
+
 <!-- ══ LOADERS & TOASTS ══ -->
 <div class="lov" id="lov"><div class="spin"></div><div class="lov-txt" id="lovTxt">Se sincronizează...</div></div>
 <div class="toast" id="toast"></div>
@@ -518,10 +559,16 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
     <div class="hdr-sub">Portal Tehnicieni</div>
   </div>
   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
-    <div class="usr-chip" id="usrChip" onclick="logoutUser()">
-      <div class="u-avfb" id="uAvFb"></div>
-      <span class="u-nm" id="uNm"></span>
-      <div class="u-tip">Deconectare</div>
+    <div style="display:flex;align-items:center;gap:4px;">
+      <div class="msg-chip" id="msgChip" onclick="openMsgPanel()" title="Mesaj">
+        🔔
+        <div class="msg-bdg" id="msgBdg">1</div>
+      </div>
+      <div class="usr-chip" id="usrChip" onclick="logoutUser()">
+        <div class="u-avfb" id="uAvFb"></div>
+        <span class="u-nm" id="uNm"></span>
+        <div class="u-tip">Deconectare</div>
+      </div>
     </div>
     <div class="adm-chip" id="admChip" onclick="openAdmPanel()">
       👑 Admin
@@ -939,7 +986,7 @@ const PONTAJ_FULL_ACCESS = ['Alin Spulbatu', 'Cristina'];
 
 // State
 let selTechs=new Set(), selWork=null, stVal=null, dp=null;
-let gData = { rapoarte:[], plan_url:'https://docs.google.com/spreadsheets/d/e/2PACX-1vRLEHiuD5sC3CtFx_vlHt9Cdg0q-XmmyQekp2-AUoysdUqVSMAFAzf8Xo4k337GYw/pubhtml', pontaj_url:'', certificari:{} };
+let gData = { rapoarte:[], plan_url:'https://docs.google.com/spreadsheets/d/e/2PACX-1vRLEHiuD5sC3CtFx_vlHt9Cdg0q-XmmyQekp2-AUoysdUqVSMAFAzf8Xo4k337GYw/pubhtml', pontaj_url:'', certificari:{}, mesaje:{} };
 
 // ╔══════════════════════════════════════════╗
 // ║  SETUP                                   ║
@@ -1016,6 +1063,7 @@ async function syncAll(silent=false) {
       }
       applyGasSheets();
       renderCert();
+      applyMessages();
       setSyncState('ok', 'Sincronizat');
       if(!silent) toast('✔ Date sincronizate!');
     } else {
@@ -1049,6 +1097,52 @@ function setSyncState(state, label) {
   const lbl = document.getElementById('syncLbl');
   dot.className = 'sync-dot ' + state;
   lbl.textContent = label;
+}
+
+// ╔══════════════════════════════════════════╗
+// ║  MESAJ — notificare din sheet "Mesaje"   ║
+// ║  Fără istoric: doar mesajul curent din    ║
+// ║  coloana tehnicianului (rândul 2).        ║
+// ╚══════════════════════════════════════════╝
+let _currentMsg = null;
+function applyMessages() {
+  const chip = document.getElementById('msgChip');
+  if (!chip) return;
+  if (!authUser || !authUser.name || !gData.mesaje) {
+    chip.style.display = 'none';
+    _currentMsg = null;
+    return;
+  }
+  const myName = authUser.name.trim();
+  const txt = (gData.mesaje[myName] || '').toString().trim();
+  const bdg = document.getElementById('msgBdg');
+  if (txt) {
+    const isNew = txt !== _currentMsg;
+    _currentMsg = txt;
+    chip.style.display = 'flex';
+    chip.classList.add('has-msg');
+    if (bdg) bdg.style.display = 'flex';
+    // Daca mesajul e nou (diferit de cel anterior afisat), deschide automat panoul
+    if (isNew) openMsgPanel();
+  } else {
+    _currentMsg = null;
+    chip.style.display = 'none';
+    chip.classList.remove('has-msg');
+    if (bdg) bdg.style.display = 'none';
+    closeMsgPanel();
+  }
+}
+function openMsgPanel() {
+  const body = document.getElementById('msgBody');
+  if (_currentMsg) {
+    body.innerHTML = `<div class="msg-body">${_currentMsg.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}</div>`;
+  } else {
+    body.innerHTML = '<div class="msg-empty">Niciun mesaj.</div>';
+  }
+  document.getElementById('msgPanel').classList.add('open');
+}
+function closeMsgPanel() {
+  document.getElementById('msgPanel').classList.remove('open');
 }
 
 // Google Apps Script: GET citeste, POST via GET param scrie (evita CORS redirect)
