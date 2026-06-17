@@ -1105,6 +1105,36 @@ function setSyncState(state, label) {
 // ║  coloana tehnicianului (rândul 2).        ║
 // ╚══════════════════════════════════════════╝
 let _currentMsg = null;
+
+// Normalizează un nume: elimină diacritice, spații multiple, convertește la lowercase
+// Permite potrivire robustă indiferent de î/i, â/a, ș/s, ț/t, majuscule etc.
+function normalizeName(s) {
+  return String(s || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')                        // descompune caracterele accentuate
+    .replace(/[\u0300-\u036f]/g, '')         // elimină diacriticele (î→i, â→a, ș→s, ț→t etc.)
+    .replace(/\s+/g, ' ');                   // normalizează spațiile multiple
+}
+
+// Caută mesajul unui tehnician în gData.mesaje cu potrivire fuzzy (ignoră diacritice + majuscule)
+function getMsgForUser(mesaje, userName) {
+  if (!mesaje || !userName) return '';
+  const normUser = normalizeName(userName);
+  // 1. Potrivire exactă (cea mai rapidă)
+  if (mesaje[userName] !== undefined) {
+    const v = String(mesaje[userName] || '').trim();
+    if (v) return v;
+  }
+  // 2. Potrivire normalizată — parcurge toate cheile din sheet
+  for (const key of Object.keys(mesaje)) {
+    if (normalizeName(key) === normUser) {
+      return String(mesaje[key] || '').trim();
+    }
+  }
+  return '';
+}
+
 function applyMessages() {
   const chip = document.getElementById('msgChip');
   if (!chip) return;
@@ -1114,7 +1144,7 @@ function applyMessages() {
     return;
   }
   const myName = authUser.name.trim();
-  const txt = (gData.mesaje[myName] || '').toString().trim();
+  const txt = getMsgForUser(gData.mesaje, myName);
   const bdg = document.getElementById('msgBdg');
   if (txt) {
     const isNew = txt !== _currentMsg;

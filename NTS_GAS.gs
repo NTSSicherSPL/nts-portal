@@ -485,7 +485,22 @@ function getPlanData_(sheetName) {
 //   la următoarea sincronizare (fără a fi salvat nicăieri).
 // ══════════════════════════════════════════════════════════════════════
 
+// Normalizează un nume: elimină diacritice și convertește la lowercase
+// Asigură potrivire robustă între numele din sheet și cel din sesiunea tehnicianului
+function normalizeName_(s) {
+  return String(s || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\u00ee\u00CE]/g, 'i')   // î Î
+    .replace(/[\u00e2\u00C2]/g, 'a')   // â Â
+    .replace(/[\u0219\u015f\u015e\u0218]/g, 's') // ș ş Ş Ș
+    .replace(/[\u021b\u0163\u0162\u021a]/g, 't') // ț ţ Ţ Ț
+    .replace(/[\u0103\u0102]/g, 'a')   // ă Ă
+    .replace(/\s+/g, ' ');
+}
+
 // Citește mesajul curent (rândul 2) pentru fiecare tehnician, din foaia "Mesaje"
+// Returnează chei originale + normalizate pentru potrivire fuzzy côté client
 function getAllMessagesByTech_() {
   var sheet = getSheet_(SHEET_MESAJE);
   var values = sheet.getDataRange().getValues();
@@ -497,7 +512,11 @@ function getAllMessagesByTech_() {
     var techName = String(name || '').trim();
     if (!techName) return;
     var txt = String(row2[colIdx] || '').trim();
+    // Cheie originală (compatibilitate cu potrivire exactă)
     result[techName] = txt;
+    // Cheie normalizată (pentru potrivire fuzzy în client)
+    var normKey = normalizeName_(techName);
+    if (normKey !== techName) result[normKey] = txt;
   });
   return result;
 }
