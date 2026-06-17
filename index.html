@@ -1005,7 +1005,7 @@ function initApp() {
   buildTech(); buildPills(); buildMonths();
   buildTechDropdowns();
   syncAll(); injectMF();
-  setInterval(() => syncAll(true), 90 * 1000); // 90 secunde
+  setInterval(() => syncAll(true), 30 * 1000); // 30 secunde
   setInterval(() => silentRecheck(), 30 * 60 * 1000);
 }
 
