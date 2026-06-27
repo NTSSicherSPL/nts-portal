@@ -473,6 +473,10 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
 #planWrap .plan-mobile{display:none;}
 #planWrap .plan-cell-link{display:inline-flex;align-items:center;min-height:28px;color:var(--gold);font-weight:700;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;overflow-wrap:anywhere;}
 #planWrap .plan-cell-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px;}
+.plan-contractor-filter{display:flex;align-items:center;gap:9px;margin-bottom:10px;padding:7px 9px;border:1px solid var(--b);border-radius:10px;background:rgba(13,30,51,.75);}
+.plan-contractor-filter label{flex:0 0 auto;margin:0;color:var(--dim);font-size:.63rem;}
+.plan-contractor-filter select{min-width:0;height:38px;padding:0 10px;border-color:var(--b2);font-family:'Rajdhani',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;}
+.plan-contractor-filter select:disabled{cursor:wait;opacity:.55;}
 @media(max-width:640px){
   #planWrap{overflow:visible!important;border:0!important;background:transparent!important;}
   #planWrap .plan-scroll-hint,#planWrap .plan-table-scroll{display:none;}
@@ -711,6 +715,14 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
       </select>
       <button id="planBtnNext" onclick="planNav(1)" style="flex-shrink:0;width:42px;height:42px;background:var(--card);border:1px solid var(--b2);border-radius:10px;color:var(--accent);font-size:1.7rem;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;">&#8250;</button>
       <button onclick="planReload()" style="flex-shrink:0;width:42px;height:42px;background:rgba(0,170,255,.1);border:1px solid var(--b2);border-radius:10px;color:var(--accent);font-size:1.1rem;display:flex;align-items:center;justify-content:center;cursor:pointer;" title="Actualizează">🔄</button>
+    </div>
+
+    <!-- Filtru contractor -->
+    <div class="plan-contractor-filter">
+      <label for="planContractorSelect">🏢 Contractor</label>
+      <select id="planContractorSelect" onchange="planSelectContractor(this.value)" disabled>
+        <option value="">Toți contractorii</option>
+      </select>
     </div>
 
     <!-- Status bar -->
@@ -1688,6 +1700,11 @@ let PLAN_SHEET_NAMES = [];
 let PLAN_SHEET_GIDS  = {};   // map name → gid pentru link direct la foaie
 let planCurrentIdx   = 0;
 let planRefreshTimer = null;
+let planContractorFilter = '';
+let planContractorManuallySelected = false;
+let planAutoContractor = '';
+let planCurrentData = null;
+let planCurrentInfo = null;
 
 // ── ISO week ──────────────────────────────────────────────────────
 function getISOWeek(d) {
@@ -1875,10 +1892,95 @@ function planDataToHtml(name, rows, styles, links) {
     </table></div>`;
 }
 
+function planFilterData(rows, styles, links, contractor) {
+  if (!contractor || !rows || rows.length < 2) return { rows, styles, links };
+  const indexes = [0];
+  for (let i = 1; i < rows.length; i++)
+    if (String(rows[i]?.[0] ?? '').trim() === contractor) indexes.push(i);
+
+  const filteredStyles = styles ? {} : null;
+  if (styles) Object.keys(styles).forEach(key => {
+    filteredStyles[key] = indexes.map(i => styles[key]?.[i] || []);
+  });
+  return {
+    rows: indexes.map(i => rows[i]),
+    styles: filteredStyles,
+    links: links ? indexes.map(i => links[i] || []) : null
+  };
+}
+
+function planFindUserContractor(rows) {
+  const userName = String(authUser?.name || '').trim();
+  if (!userName || !rows || rows.length < 2) return '';
+  const clean = value => normalizeName(value).replace(/[^a-z0-9]+/g,' ').trim();
+  const userTokens = clean(userName).split(/\s+/).filter(token => token.length >= 3);
+  if (!userTokens.length) return '';
+
+  const header = rows[0] || [];
+  const teamColumns = [];
+  for (let ci = 1; ci < header.length; ci++)
+    if (planDayParts(header[ci])) teamColumns.push(ci);
+
+  for (let ri = 1; ri < rows.length; ri++) {
+    for (const ci of teamColumns) {
+      const teamTokens = clean(rows[ri]?.[ci]).split(/\s+/).filter(Boolean);
+      if (userTokens.some(userToken => teamTokens.some(teamToken =>
+        teamToken === userToken || (userToken.length >= 5 && teamToken.includes(userToken))
+      ))) return String(rows[ri]?.[0] || '').trim();
+    }
+  }
+  return '';
+}
+
+function planUpdateContractorSelect(rows) {
+  const sel = document.getElementById('planContractorSelect');
+  if (!sel) return;
+  const contractors = [...new Set((rows || []).slice(1)
+    .map(row => String(row?.[0] ?? '').trim()).filter(Boolean))];
+  planAutoContractor = planFindUserContractor(rows);
+  if (!planContractorManuallySelected) planContractorFilter = planAutoContractor;
+  if (planContractorFilter && !contractors.includes(planContractorFilter)) {
+    planContractorFilter = planAutoContractor && contractors.includes(planAutoContractor) ? planAutoContractor : '';
+    planContractorManuallySelected = false;
+  }
+  sel.innerHTML = '<option value="">🏢 Toți contractorii</option>' + contractors.map(value => {
+    const meta = planContractorMeta(value);
+    const mine = value === planAutoContractor ? ' · echipa ta' : '';
+    return `<option value="${planEscapeHtml(value)}">${planEscapeHtml(meta.code)} — ${planEscapeHtml(meta.name + mine)}</option>`;
+  }).join('');
+  sel.value = planContractorFilter;
+  sel.disabled = contractors.length === 0;
+}
+
+function planRenderContractorFilter() {
+  if (!planCurrentData) return;
+  const wrap = document.getElementById('planWrap');
+  const st = document.getElementById('planStatus');
+  const filtered = planFilterData(
+    planCurrentData.rows, planCurrentData.styles, planCurrentData.links, planContractorFilter
+  );
+  if (wrap) wrap.innerHTML = planDataToHtml(
+    planCurrentData.name, filtered.rows, filtered.styles, filtered.links
+  );
+
+  const visible = Math.max(0, (filtered.rows?.length || 1) - 1);
+  const total = Math.max(0, (planCurrentData.rows?.length || 1) - 1);
+  const selected = planContractorFilter ? ` · ${planContractorMeta(planContractorFilter).name}` : '';
+  const current = planCurrentInfo?.isCurrent ? ' ✦ săptămâna curentă' : '';
+  if (st) st.textContent = `✅ ${planCurrentData.name}${current}${selected} · ${visible}/${total} contractori · actualizat ${planCurrentInfo?.time || ''}`;
+}
+
+function planSelectContractor(value) {
+  planContractorFilter = String(value || '');
+  planContractorManuallySelected = true;
+  planRenderContractorFilter();
+}
+
 // ── Render principal ──────────────────────────────────────────────
 async function renderPlan() {
   const st   = document.getElementById('planStatus');
   const sel  = document.getElementById('planSelect');
+  const contractorSel = document.getElementById('planContractorSelect');
   const wrap = document.getElementById('planWrap');
 
   if (st)   st.textContent = '🔍 Se încarcă lista de săptămâni din GAS...';
@@ -1943,10 +2045,12 @@ async function loadPlanSheet(idx) {
   const wrap = document.getElementById('planWrap');
   const st   = document.getElementById('planStatus');
   const sel  = document.getElementById('planSelect');
+  const contractorSel = document.getElementById('planContractorSelect');
   const prev = document.getElementById('planBtnPrev');
   const next = document.getElementById('planBtnNext');
 
   if (sel)  sel.value = name;
+  if (contractorSel) contractorSel.disabled = true;
   if (prev) prev.style.opacity = idx===0 ? '0.3' : '1';
   if (next) next.style.opacity = idx===PLAN_SHEET_NAMES.length-1 ? '0.3' : '1';
   // Actualizeaza link-ul butonului GSheets cu foaia curenta
@@ -1962,14 +2066,15 @@ async function loadPlanSheet(idx) {
 
   try {
     const { rows, styles, links } = await fetchPlanData(name);
-    const html = planDataToHtml(name, rows, styles, links);
-    if (wrap) wrap.innerHTML = html;
     const ora  = new Date().toLocaleTimeString('ro-RO',{hour:'2-digit',minute:'2-digit'});
-    const nRows = rows ? Math.max(0, rows.length - 1) : 0;
-    if (st) st.textContent =
-      `✅ ${name}${kwNum===kwCur?' ✦ săptămâna curentă':''} · ${nRows} înregistrări · actualizat ${ora}`;
+    planCurrentData = { name, rows, styles, links };
+    planCurrentInfo = { time:ora, isCurrent:kwNum===kwCur };
+    planUpdateContractorSelect(rows);
+    planRenderContractorFilter();
 
   } catch(e) {
+    planCurrentData = null;
+    if (contractorSel) contractorSel.disabled = true;
     // GAS nu are getPlanData — arată buton de deschidere directă + instrucțiuni
     const ssUrl = 'https://docs.google.com/spreadsheets/d/' + PLAN_SS_ID + '/edit#gid=0';
     if (wrap) wrap.innerHTML = `
