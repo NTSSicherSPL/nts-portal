@@ -470,19 +470,40 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
 #planWrap .plan-scroll-hint{display:none;}
 #planWrap .plan-table-scroll{max-width:100%;overflow:auto;-webkit-overflow-scrolling:touch;scrollbar-color:var(--b2) var(--inp);}
 #planWrap .plan-table{width:max-content;min-width:100%;border-collapse:collapse;font-size:.75rem;}
+#planWrap .plan-mobile{display:none;}
 #planWrap .plan-cell-link{display:inline-flex;align-items:center;min-height:28px;color:var(--gold);font-weight:700;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;overflow-wrap:anywhere;}
 #planWrap .plan-cell-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px;}
 @media(max-width:640px){
-  #planWrap{overflow:hidden!important;border:1px solid var(--b)!important;background:var(--card)!important;}
-  #planWrap .plan-scroll-hint{display:flex;align-items:center;justify-content:center;gap:7px;padding:7px 10px;background:var(--inp);border-bottom:1px solid var(--b);color:var(--dim);font-size:.66rem;letter-spacing:.05em;}
-  #planWrap .plan-table-scroll{max-height:65dvh;overflow:auto;overscroll-behavior:contain;touch-action:pan-x pan-y;}
-  #planWrap .plan-table{min-width:760px;font-size:.7rem;line-height:1.25;}
-  #planWrap .plan-table th{position:sticky;top:0;z-index:3;min-width:105px;max-width:180px;padding:8px 7px!important;background:#102743;white-space:normal!important;overflow-wrap:anywhere;box-shadow:0 1px 0 var(--b);}
-  #planWrap .plan-table td{min-width:105px;max-width:210px;padding:7px!important;white-space:normal!important;overflow-wrap:anywhere;word-break:normal;}
-  #planWrap .plan-table th:first-child{left:0;z-index:5;min-width:115px;box-shadow:1px 1px 0 var(--b2);}
-  #planWrap .plan-table td:first-child{position:sticky;left:0;z-index:2;min-width:115px;background:var(--card);font-weight:700;box-shadow:1px 0 0 var(--b2);}
-  #planWrap .plan-table tbody tr:nth-child(even) td:first-child{background:#0b1a2e;}
-  #planWrap .plan-cell-link{display:inline;min-height:0;padding:3px 0;white-space:normal;}
+  #planWrap{overflow:visible!important;border:0!important;background:transparent!important;}
+  #planWrap .plan-scroll-hint,#planWrap .plan-table-scroll{display:none;}
+  #planWrap .plan-mobile{display:grid;gap:14px;}
+  #planWrap .plan-contractor{overflow:hidden;border:1px solid var(--b);border-left:4px solid var(--accent);border-radius:12px;background:var(--card);box-shadow:0 5px 18px rgba(0,0,0,.18);}
+  #planWrap .plan-contractor.plan-r4y{border-left-color:var(--green);}
+  #planWrap .plan-contractor.plan-ats{border-left-color:var(--gold);}
+  #planWrap .plan-contractor-head{display:flex;align-items:center;gap:10px;padding:11px 12px;background:linear-gradient(90deg,rgba(0,170,255,.11),rgba(0,170,255,.025));border-bottom:1px solid var(--b);}
+  #planWrap .plan-contractor-code{flex:0 0 auto;min-width:54px;padding:5px 8px;border:1px solid currentColor;border-radius:7px;color:var(--accent);font-family:'Rajdhani',sans-serif;font-size:.9rem;font-weight:700;letter-spacing:.06em;text-align:center;}
+  #planWrap .plan-r4y .plan-contractor-code{color:var(--green);}
+  #planWrap .plan-ats .plan-contractor-code{color:var(--gold);}
+  #planWrap .plan-contractor-name{min-width:0;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:1rem;font-weight:700;line-height:1.15;}
+  #planWrap .plan-contractor-label,#planWrap .plan-field-label{display:block;margin-bottom:3px;color:var(--dim);font-family:'DM Sans',sans-serif;font-size:.57rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;}
+  #planWrap .plan-days{display:grid;gap:9px;padding:10px;}
+  #planWrap .plan-day-card{overflow:hidden;border:1px solid rgba(42,80,128,.8);border-radius:10px;background:var(--inp);}
+  #planWrap .plan-day-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:rgba(0,170,255,.09);border-bottom:1px solid var(--b);}
+  #planWrap .plan-day-name{color:var(--accent);font-family:'Rajdhani',sans-serif;font-size:.82rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;}
+  #planWrap .plan-day-date{padding:3px 7px;border-radius:999px;background:rgba(0,170,255,.12);color:var(--text);font-size:.68rem;font-weight:600;}
+  #planWrap .plan-team{display:flex;align-items:flex-start;gap:8px;padding:10px;border-bottom:1px solid rgba(26,48,80,.7);}
+  #planWrap .plan-team-icon{flex:0 0 auto;font-size:1rem;line-height:1.35;}
+  #planWrap .plan-team-text{min-width:0;color:#fff;font-size:.88rem;font-weight:700;line-height:1.35;overflow-wrap:anywhere;}
+  #planWrap .plan-day-fields{display:grid;grid-template-columns:1fr 1fr;}
+  #planWrap .plan-day-field{min-width:0;padding:9px 10px;border-right:1px solid rgba(26,48,80,.7);border-bottom:1px solid rgba(26,48,80,.7);color:var(--text);font-size:.78rem;line-height:1.4;overflow-wrap:anywhere;}
+  #planWrap .plan-day-field:nth-child(2n){border-right:0;}
+  #planWrap .plan-day-field.plan-info{grid-column:1/-1;border-right:0;border-bottom:0;}
+  #planWrap .plan-site-value{color:var(--gold);font-size:.88rem;font-weight:700;}
+  #planWrap .plan-ticket-value{color:#bcd4ea;font-weight:600;}
+  #planWrap .plan-free{color:var(--green);font-weight:700;text-transform:uppercase;}
+  #planWrap .plan-cancel{color:var(--red);font-weight:700;text-transform:uppercase;}
+  #planWrap .plan-cell-link{display:inline;min-height:0;color:var(--gold);font-size:inherit;white-space:normal;}
+  #planWrap .plan-no-days{padding:12px;color:var(--dim);font-size:.73rem;text-align:center;}
 }
 
 </style>
@@ -1709,6 +1730,82 @@ function planSafeUrl(value) {
   return /^(https?:\/\/)/i.test(url) ? url : '';
 }
 
+function planDayParts(value) {
+  const raw = String(value ?? '').trim();
+  const match = raw.match(/^(lun|mar|mie|joi|vin|s[aâ]m|dum)[a-zăâîșț.]*\s*(\d{1,2}\/\d{1,2})/i);
+  if (!match) return null;
+  const key = match[1].toLowerCase().replace('â','a');
+  const names = { lun:'Luni', mar:'Marți', mie:'Miercuri', joi:'Joi', vin:'Vineri', sam:'Sâmbătă', dum:'Duminică' };
+  return { name:names[key] || match[1], date:match[2] };
+}
+
+function planContractorMeta(value) {
+  const raw = String(value ?? '').trim();
+  const key = raw.toUpperCase().replace(/\s+/g,'');
+  if (key === 'W&A' || key.includes('WEISS')) return { code:'W&A', name:'Weiss & Appetito', cls:'plan-wa' };
+  if (key === 'R4Y' || key.includes('ROAD4YOU')) return { code:'R4Y', name:'Road4You', cls:'plan-r4y' };
+  if (key.startsWith('ATS')) return { code:'ATS', name:'ATS Mobilfunk', cls:'plan-ats' };
+  return { code:raw || '—', name:raw || 'Contractor nespecificat', cls:'' };
+}
+
+function planMobileValue(value, url, className) {
+  const text = String(value ?? '').trim();
+  const safeUrl = planSafeUrl(url) || planSafeUrl(text);
+  const stateClass = /^liber$/i.test(text) ? ' plan-free' : (/^cancel(?:led)?$/i.test(text) ? ' plan-cancel' : '');
+  const css = `${className || ''}${stateClass}`.trim();
+  const html = planEscapeHtml(text).replace(/\n/g,'<br>') || '—';
+  return safeUrl
+    ? `<a class="plan-cell-link ${css}" href="${planEscapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer">${html}</a>`
+    : `<span class="${css}">${html}</span>`;
+}
+
+function planMobileHtml(header, body, links) {
+  const days = [];
+  for (let ci = 1; ci < header.length; ci++) {
+    const parts = planDayParts(header[ci]);
+    if (parts) days.push({ start:ci, name:parts.name, date:parts.date });
+  }
+  days.forEach((day, i) => { day.end = i + 1 < days.length ? days[i + 1].start : header.length; });
+
+  const cards = body.map((row, ri) => {
+    const gi = ri + 1;
+    const contractor = planContractorMeta(row[0]);
+    const dayCards = days.map(day => {
+      const findColumn = needle => {
+        for (let ci = day.start + 1; ci < day.end; ci++)
+          if (String(header[ci] ?? '').toLowerCase().includes(needle)) return ci;
+        return -1;
+      };
+      const teamCi = day.start;
+      const siteCi = findColumn('site');
+      const ticketCi = findColumn('ticket');
+      const infoCi = findColumn('info');
+      const team = row[teamCi];
+      const site = siteCi >= 0 ? row[siteCi] : '';
+      const ticket = ticketCi >= 0 ? row[ticketCi] : '';
+      const info = infoCi >= 0 ? row[infoCi] : '';
+      if (![team,site,ticket,info].some(v => String(v ?? '').trim())) return '';
+
+      const fields = [];
+      if (String(site ?? '').trim()) fields.push(`<div class="plan-day-field"><span class="plan-field-label">Site</span>${planMobileValue(site,links?.[gi]?.[siteCi],'plan-site-value')}</div>`);
+      if (String(ticket ?? '').trim()) fields.push(`<div class="plan-day-field"><span class="plan-field-label">Ticket</span>${planMobileValue(ticket,links?.[gi]?.[ticketCi],'plan-ticket-value')}</div>`);
+      if (String(info ?? '').trim()) fields.push(`<div class="plan-day-field plan-info"><span class="plan-field-label">Informații lucrare</span>${planMobileValue(info,links?.[gi]?.[infoCi],'')}</div>`);
+
+      return `<section class="plan-day-card">
+        <div class="plan-day-head"><span class="plan-day-name">${planEscapeHtml(day.name)}</span><span class="plan-day-date">${planEscapeHtml(day.date)}</span></div>
+        <div class="plan-team"><span class="plan-team-icon">👷</span><div class="plan-team-text"><span class="plan-field-label">Echipă</span>${planMobileValue(team,links?.[gi]?.[teamCi],'')}</div></div>
+        ${fields.length ? `<div class="plan-day-fields">${fields.join('')}</div>` : ''}
+      </section>`;
+    }).filter(Boolean).join('');
+
+    return `<article class="plan-contractor ${contractor.cls}">
+      <header class="plan-contractor-head"><span class="plan-contractor-code">${planEscapeHtml(contractor.code)}</span><div class="plan-contractor-name"><span class="plan-contractor-label">Contractor</span>${planEscapeHtml(contractor.name)}</div></header>
+      ${dayCards ? `<div class="plan-days">${dayCards}</div>` : '<div class="plan-no-days">Nicio lucrare planificată.</div>'}
+    </article>`;
+  }).join('');
+  return `<div class="plan-mobile">${cards}</div>`;
+}
+
 // ── Render tabel cu stiluri text din GAS (fără background) ───────
 function planDataToHtml(name, rows, styles, links) {
   if (!rows || rows.length < 2) {
@@ -1769,7 +1866,8 @@ function planDataToHtml(name, rows, styles, links) {
     return `<tr style="${bg}">${tds}</tr>`;
   }).join('');
 
-  return `<div class="plan-scroll-hint" aria-hidden="true">↔ Glisează pentru a vedea toate coloanele</div>
+  const mobileHtml = planMobileHtml(header, body, links);
+  return `${mobileHtml}<div class="plan-scroll-hint" aria-hidden="true">↔ Glisează pentru a vedea toate coloanele</div>
     <div class="plan-table-scroll" tabindex="0" aria-label="Plan ${planEscapeHtml(name)}; derulează orizontal pentru toate coloanele">
     <table class="plan-table">
       <thead><tr style="background:rgba(0,170,255,.07);">${thHtml}</tr></thead>
