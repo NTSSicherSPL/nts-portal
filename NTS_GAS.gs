@@ -114,11 +114,7 @@ function getData_() {
       mesaje:      getAllMessagesByTech_(),
       plan_url:    cfg.plan_url   || '',
       pontaj_url:  cfg.pontaj_url || '',
-      planSheets:  getPlanSheetsList_(),
-      // ── Credențiale NAS — citite din tab-ul Config ────────────────
-      // Modifică valorile direct în foaia Config (rândurile nas_user / nas_pass)
-      nas_user:    cfg.nas_user   || '',
-      nas_pass:    cfg.nas_pass   || ''
+      planSheets:  getPlanSheetsList_()
     }
   };
 }
@@ -228,8 +224,6 @@ function getTehnicieni_() {
 // ├─────────────┼──────────────────────┤
 // │ plan_url    │ https://...          │
 // │ pontaj_url  │ https://...          │
-// │ nas_user    │ Field                │  ← modifică aici username-ul NAS
-// │ nas_pass    │ NTSTeamWork2026!     │  ← modifică aici parola NAS
 // └─────────────┴──────────────────────┘
 //
 function getConfig_() {
@@ -444,6 +438,24 @@ function getPlanSheets_() {
   }catch(e){return{ok:false,error:'Nu pot accesa Plan NTS Field: '+e.message};}
 }
 
+// Returnează hyperlinkul asociat unei celule din PLAN, dacă există.
+// Acoperă atât linkurile inserate direct în text, cât și formulele HYPERLINK.
+function getPlanCellLink_(richText, formula) {
+  try {
+    if (richText) {
+      var url=richText.getLinkUrl();
+      if(url)return url;
+      var runs=richText.getRuns ? richText.getRuns() : [];
+      for(var i=0;i<runs.length;i++){
+        var runUrl=runs[i].getLinkUrl();
+        if(runUrl)return runUrl;
+      }
+    }
+  }catch(ignore){}
+  var match=String(formula||'').match(/^=HYPERLINK\s*\(\s*"((?:[^"]|"")*)"/i);
+  return match ? match[1].replace(/""/g,'"') : '';
+}
+
 // ══ getPlanData ══════════════════════════════════════════════════════
 function getPlanData_(sheetName) {
   if (!sheetName||!/^KW\d{2}$/i.test(sheetName))
@@ -455,7 +467,13 @@ function getPlanData_(sheetName) {
     if(!sheet) return {ok:false,error:'Foaia '+name+' nu există'};
     var range=sheet.getDataRange();
     var values=range.getValues(),fw=range.getFontWeights(),fs=range.getFontStyles(),
-        fz=range.getFontSizes(),ff=range.getFontFamilies();
+        fz=range.getFontSizes(),ff=range.getFontFamilies(),
+        rich=range.getRichTextValues(),formulas=range.getFormulas();
+    var links=values.map(function(row,r){
+      return row.map(function(cell,c){
+        return getPlanCellLink_(rich[r][c],formulas[r][c]);
+      });
+    });
     var keepRows=[];
     for(var r=0;r<values.length;r++){
       var empty=values[r].every(function(c){return c===''||c===null||c===undefined;});
@@ -463,7 +481,7 @@ function getPlanData_(sheetName) {
     }
     if(keepRows.length===0&&values.length>0)keepRows.push(0);
     var sl=function(arr){return keepRows.map(function(i){return arr[i];});};
-    return {ok:true,sheet:name,data:sl(values),styles:{fontWeights:sl(fw),fontStyles:sl(fs),fontSizes:sl(fz),fontFamilies:sl(ff)}};
+    return {ok:true,sheet:name,data:sl(values),links:sl(links),styles:{fontWeights:sl(fw),fontStyles:sl(fs),fontSizes:sl(fz),fontFamilies:sl(ff)}};
   }catch(e){return{ok:false,error:'Eroare citire '+sheetName+': '+e.message};}
 }
 
@@ -520,5 +538,3 @@ function getAllMessagesByTech_() {
   });
   return result;
 }
-
-
