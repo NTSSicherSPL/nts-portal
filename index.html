@@ -465,6 +465,26 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
   white-space:pre-wrap;word-break:break-word;}
 .msg-empty{text-align:center;padding:28px;color:var(--dim);font-size:.79rem;}
 
+/* ══ PLAN — tabel responsive + linkuri din Google Sheets ══ */
+#planWrap{max-width:100%;}
+#planWrap .plan-table-scroll{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+#planWrap .plan-table{width:max-content;min-width:100%;border-collapse:collapse;font-size:.75rem;}
+#planWrap .plan-cell-link{display:inline-flex;align-items:center;min-height:28px;color:var(--gold);font-weight:700;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;overflow-wrap:anywhere;}
+#planWrap .plan-cell-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px;}
+@media(max-width:640px){
+  #planWrap{border:0!important;background:transparent!important;overflow:visible!important;}
+  #planWrap .plan-table-scroll{overflow:visible;}
+  #planWrap .plan-table{display:block;width:100%;font-size:.8rem;}
+  #planWrap .plan-table thead{display:none;}
+  #planWrap .plan-table tbody{display:grid;gap:10px;}
+  #planWrap .plan-table tr{display:block!important;background:var(--card)!important;border:1px solid var(--b);border-radius:var(--r);overflow:hidden;}
+  #planWrap .plan-table td{display:grid;grid-template-columns:minmax(92px,38%) minmax(0,1fr);gap:9px;align-items:start;width:100%;padding:8px 10px!important;border-bottom:1px solid rgba(26,48,80,.55)!important;white-space:normal!important;overflow-wrap:anywhere;}
+  #planWrap .plan-table td:last-child{border-bottom:0!important;}
+  #planWrap .plan-table td.plan-empty{display:none;}
+  #planWrap .plan-table td::before{content:attr(data-label);color:var(--dim);font-family:'Rajdhani',sans-serif;font-size:.67rem;font-weight:700;letter-spacing:.08em;line-height:1.35;text-transform:uppercase;}
+  #planWrap .plan-cell-link{min-height:40px;margin:-7px -4px;padding:7px 4px;}
+}
+
 </style>
 </head>
 <body>
@@ -1675,11 +1695,22 @@ async function fetchPlanSheets() {
 async function fetchPlanData(sheetName) {
   const res = await apiCall('GET', { action: 'getPlanData', sheet: sheetName });
   if (!res || !res.ok) throw new Error(res?.error || 'GAS nu a returnat date');
-  return { rows: res.data, styles: res.styles || null };
+  return { rows: res.data, styles: res.styles || null, links: res.links || null };
+}
+
+function planEscapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[ch]);
+}
+
+function planSafeUrl(value) {
+  const url = String(value ?? '').trim();
+  return /^(https?:\/\/)/i.test(url) ? url : '';
 }
 
 // ── Render tabel cu stiluri text din GAS (fără background) ───────
-function planDataToHtml(name, rows, styles) {
+function planDataToHtml(name, rows, styles, links) {
   if (!rows || rows.length < 2) {
     return `<div class="frame-ph" style="min-height:180px;">
       <div class="bi">📭</div>
@@ -1700,7 +1731,7 @@ function planDataToHtml(name, rows, styles) {
     const fi = fss?.[0]?.[ci] === 'italic' ? 'font-style:italic;' : '';
     return `<th style="padding:8px 10px;text-align:left;font-family:'Rajdhani',sans-serif;
       font-size:.66rem;${fw}${fi}letter-spacing:.13em;text-transform:uppercase;
-      color:var(--accent);border-bottom:1px solid var(--b);white-space:nowrap;">${col ?? ''}</th>`;
+      color:var(--accent);border-bottom:1px solid var(--b);white-space:nowrap;">${planEscapeHtml(col)}</th>`;
   }).join('');
 
   // ── Body ──────────────────────────────────────────────────────
@@ -1723,17 +1754,23 @@ function planDataToHtml(name, rows, styles) {
       else if (lo==='nefinalizat'||lo==='nu'||lo==='no') color = 'color:var(--red);font-weight:600;';
       else if (/^[A-Z]{2}\d{3,}/.test(s)||/^\d{7,}$/.test(s)) color = 'color:var(--gold);font-weight:600;';
 
-      const sHtml = s.replace(/\n/g, '<br>');
+      const sHtml = planEscapeHtml(s).replace(/\n/g, '<br>');
+      const sheetUrl = planSafeUrl(links?.[gi]?.[ci]);
+      const directUrl = planSafeUrl(s);
+      const cellUrl = sheetUrl || directUrl;
+      const content = cellUrl
+        ? `<a class="plan-cell-link" href="${planEscapeHtml(cellUrl)}" target="_blank" rel="noopener noreferrer" title="Deschide linkul">${sHtml || '↗'}</a>`
+        : (sHtml || '—');
       const st = `padding:5px 8px;border-bottom:1px solid rgba(26,48,80,.4);
         vertical-align:top;line-height:1.3;white-space:nowrap;${color}${fw}${fi}${fz}`;
-      return `<td style="${st}">${sHtml || '—'}</td>`;
+      return `<td class="${s ? '' : 'plan-empty'}" data-label="${planEscapeHtml(header[ci] ?? '')}" style="${st}">${content}</td>`;
     }).join('');
     const bg = ri%2!==0 ? 'background:rgba(0,170,255,.02);' : '';
     return `<tr style="${bg}">${tds}</tr>`;
   }).join('');
 
-  return `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-    <table style="width:max-content;min-width:100%;border-collapse:collapse;font-size:.75rem;">
+  return `<div class="plan-table-scroll">
+    <table class="plan-table">
       <thead><tr style="background:rgba(0,170,255,.07);">${thHtml}</tr></thead>
       <tbody>${tbHtml}</tbody>
     </table></div>`;
@@ -1825,8 +1862,8 @@ async function loadPlanSheet(idx) {
     <p style="font-size:.82rem;">Se încarcă <strong style="color:var(--accent)">${name}</strong>...</p></div>`;
 
   try {
-    const { rows, styles } = await fetchPlanData(name);
-    const html = planDataToHtml(name, rows, styles);
+    const { rows, styles, links } = await fetchPlanData(name);
+    const html = planDataToHtml(name, rows, styles, links);
     if (wrap) wrap.innerHTML = html;
     const ora  = new Date().toLocaleTimeString('ro-RO',{hour:'2-digit',minute:'2-digit'});
     const nRows = rows ? Math.max(0, rows.length - 1) : 0;
