@@ -944,12 +944,6 @@ let TECHS = [
 ];
 const WORK_TYPES = ['Swap','Preinstall','Clean-up','Install','Activități Anexe'];
 
-// ── PONTAJ — utilizatori cu acces complet (văd toate echipele și toți tehnicienii) ──
-// Adminul are deja acces complet automat (prin authUser.isAdmin).
-// Adaugă aici nume care, deși nu sunt admin, trebuie să vadă toată activitatea.
-// Toți ceilalți tehnicieni văd DOAR rapoartele în care apare NUMELE LOR.
-const PONTAJ_FULL_ACCESS = ['Alin Spulbatu', 'Cristina'];
-
 // State
 let selTechs=new Set(), selWork=null, stVal=null, dp=null;
 let gData = { rapoarte:[], plan_url:'https://docs.google.com/spreadsheets/d/e/2PACX-1vRLEHiuD5sC3CtFx_vlHt9Cdg0q-XmmyQekp2-AUoysdUqVSMAFAzf8Xo4k337GYw/pubhtml', pontaj_url:'', certificari:{}, mesaje:{} };
@@ -2157,18 +2151,11 @@ function getTeamForTech(techName) {
 
 // ── Permisiuni Pontaj ────────────────────────────────────────────
 // Reguli:
-//  • Admin (după email) → vede tot
-//  • Nume din PONTAJ_FULL_ACCESS → văd tot (ex: Alin Spulbatu)
-//  • Restul → văd doar rapoartele echipei lor + cele unde apar personal
+//  • Rol "admin" în AccessControl → vede toate rapoartele
+//  • Rol "user" sau gol → vede doar rapoartele în care apare numele lui
 function canSeeAllPontaj() {
   if (!authUser) return false;
-  if (authUser.isAdmin) return true;
-  const n = (authUser.name||'').trim().toLowerCase();
-  if (!n) return false;
-  return PONTAJ_FULL_ACCESS.some(name => {
-    const target = name.trim().toLowerCase();
-    return n === target || n.includes(target) || target.includes(n);
-  });
+  return authUser.isAdmin || String(authUser.role||'').trim().toLowerCase() === 'admin';
 }
 
 function getMyTeam() {
@@ -2194,7 +2181,7 @@ function filterByPontajPermissions(rapoarte) {
 // Reguli:
 //  - Filtrul de echipa se blocheaza pe echipa lui (UI)
 //  - Filtrul de tehnician se limiteaza la numele lui propriu (vede doar rapoartele lui)
-//  - Exceptii cu acces complet: PONTAJ_FULL_ACCESS si admin
+//  - Excepție cu acces complet: rolul admin din AccessControl
 function applyPontajPermissionsUI() {
   if (canSeeAllPontaj()) return;
   const myTeam = getMyTeam();
@@ -2512,6 +2499,36 @@ const SESS_TTL   = 100 * 365 * 24 * 60 * 60 * 1000; // Permanent
 
 let authUser  = null;
 
+function refreshPontajRoleUI() {
+  const fTeam = document.getElementById('fTeam');
+  if (fTeam) {
+    fTeam.innerHTML = '<option value="">Toate echipele</option>' +
+      ['Echipa 1','Echipa 2','Echipa 3','Echipa 4'].map(team => `<option value="${team}">${team}</option>`).join('');
+    fTeam.disabled = false;
+    fTeam.style.opacity = '1';
+    fTeam.style.cursor = '';
+  }
+  const fTech = document.getElementById('fTech');
+  if (fTech) {
+    fTech.disabled = false;
+    fTech.style.opacity = '1';
+    fTech.style.cursor = '';
+  }
+  buildTechDropdowns();
+  applyPontajPermissionsUI();
+  renderP();
+}
+
+function applyRoleFromResponse(res, refreshUI) {
+  if (!authUser || !res) return false;
+  const role = String(res.role||'').trim().toLowerCase() === 'admin' ? 'admin' : 'user';
+  const changed = authUser.role !== role;
+  authUser = { ...authUser, role };
+  if (authUser.status === 'approved') saveSession(authUser);
+  if (refreshUI && changed) refreshPontajRoleUI();
+  return changed;
+}
+
 // ── Afisare vista ─────────────────────────────────────────────────
 function showView(id) {
   document.querySelectorAll('.ao-view').forEach(v => v.classList.remove('on'));
@@ -2552,7 +2569,9 @@ async function stepSendCode() {
 
     if (status === 'approved' || status === 'verified') {
       // Acces aprobat în spreadsheet → intrare directă, fără OTP
-      saveSession({ ...authUser, status: 'approved' });
+      applyRoleFromResponse(res, false);
+      authUser = { ...authUser, status: 'approved' };
+      saveSession(authUser);
       grantAccess(authUser);
     } else if (status === 'pending' || status === 'new') {
       showView('vPending');
@@ -2611,7 +2630,9 @@ async function pollNow() {
     const res = await apiCall('GET', { action: 'checkStatus', email: authUser.email });
     if (!res) { showView('vPending'); toast('Nu s-a putut verifica. Încearcă din nou.', false, true); return; }
     if (res.status === 'approved' || res.status === 'verified') {
-      saveSession({ ...authUser, status: 'approved' });
+      applyRoleFromResponse(res, false);
+      authUser = { ...authUser, status: 'approved' };
+      saveSession(authUser);
       grantAccess(authUser);
     } else if (res.status === 'denied') {
       showView('vDenied');
@@ -2634,6 +2655,8 @@ async function silentRecheck() {
       clearSession();
       toast('⛔ Accesul tău a fost revocat.', true);
       setTimeout(() => location.reload(), 2500);
+    } else if (res && (res.status === 'approved' || res.status === 'verified')) {
+      applyRoleFromResponse(res, true);
     }
   } catch(e) {}
 }
@@ -2771,7 +2794,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const lastCheck = s._chk || 0;
     const elapsed   = Date.now() - lastCheck;
 
-    if (elapsed > SESS_CHECK_INTERVAL) {
+    if (!s.role || elapsed > SESS_CHECK_INTERVAL) {
       // Verificare silentioasa in fundal — nu asteapta, nu blocheaza
       (async () => {
         try {
@@ -2783,8 +2806,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
           }
           if (res && (res.status === 'approved' || res.status === 'verified')) {
-            // OK — actualizam doar timestamp-ul verificarii
-            touchSessionCheck();
+            // Actualizăm și rolul (admin/user) direct din AccessControl.
+            applyRoleFromResponse(res, true);
           }
           // Daca status e unknown/pending dar avem sesiune salvata, mentinem accesul
           // (fail-open: daca GAS are probleme nu blocam userul)
