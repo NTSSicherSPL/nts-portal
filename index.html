@@ -1243,20 +1243,24 @@ function buildTechDropdowns() {
   // rqName — dropdown la pagina "Solicitări"
   const rqSel = document.getElementById('rqName');
   if (rqSel) {
-    const ph = rqSel.querySelector('option[value=""]');
     rqSel.innerHTML = '';
-    if (ph) rqSel.appendChild(ph);
-    else { const o=document.createElement('option'); o.value=''; o.textContent='— Selectează —'; rqSel.appendChild(o); }
-    TECHS.forEach(t => {
-      const o = document.createElement('option');
-      o.value = t.name; o.textContent = t.name;
-      rqSel.appendChild(o);
-    });
-    // Pre-selecteaza automat numele utilizatorului autentificat
     if (authUser && authUser.name) {
       const myName = authUser.name.trim();
-      const match = [...rqSel.options].find(o => o.value === myName);
-      if (match) rqSel.value = myName;
+      const o = document.createElement('option');
+      o.value = myName;
+      o.textContent = myName;
+      rqSel.appendChild(o);
+      rqSel.value = myName;
+      rqSel.disabled = true;
+      rqSel.style.opacity = '0.75';
+      rqSel.style.cursor = 'not-allowed';
+      rqSel.title = 'Numele este preluat automat din utilizatorul autentificat';
+    } else {
+      const o = document.createElement('option');
+      o.value = '';
+      o.textContent = '— Utilizator neidentificat —';
+      rqSel.appendChild(o);
+      rqSel.disabled = true;
     }
   }
   // fTech — dropdown la pagina "Pontaj"
@@ -1580,7 +1584,8 @@ async function dispatchEmail() {
 }
 
 function resetReqForm() {
-  document.getElementById('rqName').value = '';
+  const rqName = document.getElementById('rqName');
+  if (rqName) rqName.value = (authUser?.name || '').trim();
   document.getElementById('rqSubj').value = '';
   document.getElementById('rqMsg').value  = '';
   const d = document.getElementById('rqDate');
