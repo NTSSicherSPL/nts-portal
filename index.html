@@ -231,6 +231,10 @@ tr:hover td{background:rgba(0,170,255,.02);}
 }
 .img-remove-btn:hover{background:var(--red);}
 .img-name{font-size:.68rem;color:var(--dim);margin-top:4px;text-align:center;}
+.doc-selected{display:none;position:relative;margin-top:8px;padding:11px 42px 11px 12px;border:1px solid var(--b2);border-radius:8px;background:rgba(0,170,255,.06);}
+.doc-selected .doc-title{color:var(--text);font-size:.78rem;font-weight:600;line-height:1.3;overflow-wrap:anywhere;}
+.doc-selected .doc-meta{margin-top:3px;color:var(--dim);font-size:.65rem;}
+.doc-selected .img-remove-btn{top:50%;transform:translateY(-50%);}
 
 /* ══ SIGNATURE MODAL ══ */
 .sig-modal{
@@ -661,7 +665,7 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
 <div class="tabs">
   <button class="tab active" onclick="sw(0,this)"><span class="ti">📋</span>Raport</button>
   <button class="tab" onclick="sw(1,this)"><span class="ti">📅</span>Plan</button>
-  <button class="tab" onclick="sw(2,this)"><span class="ti">✉️</span>Solicitări</button>
+  <button class="tab" onclick="sw(2,this)"><span class="ti">✉️</span>Solicitări/Documente</button>
   <button class="tab" onclick="sw(3,this)"><span class="ti">🏅</span>Certificări</button>
   <button class="tab" onclick="sw(4,this)"><span class="ti">🕐</span>Pontaj</button>
 </div>
@@ -777,13 +781,13 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
 
   </div>
 
-  <!-- ── PAGE 2: SOLICITĂRI ── -->
+  <!-- ── PAGE 2: SOLICITĂRI / DOCUMENTE ── -->
   <div class="page" id="p2">
     <div class="info-box">
       Completează formularul — solicitarea va fi trimisă direct pe email la echipa NTS.
     </div>
     <div class="card">
-      <div class="ct">✉️ &nbsp;Trimite o Solicitare</div>
+      <div class="ct">✉️ &nbsp;Solicitări / Documente</div>
       <div class="fg">
         <div class="full">
           <label>Numele tău</label>
@@ -799,12 +803,17 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
         </div>
         <div class="full">
           <label>Subiect / Tipul solicitării</label>
-          <select id="rqSubj">
+          <select id="rqSubj" onchange="updateReqDocumentVisibility()">
             <option value="">— Selectează subiect —</option>
             <option>Concediu / Zile libere</option>
             <option>Problemă echipament</option>
             <option>Adeverință</option>
             <option>Bon spre decontare</option>
+            <option>Proces Verbal Scule</option>
+            <option>Proces Verbal Echipament</option>
+            <option>Proces Verbal PPE</option>
+            <option>Proces Verbal Auto</option>
+            <option>Proces Verbal Scule Masina</option>
             <option>Altele</option>
           </select>
         </div>
@@ -825,6 +834,23 @@ canvas#sigCanvas{display:block;width:100%;height:160px;cursor:crosshair;}
               <img id="imgPreview" src="" alt="Preview">
               <button class="img-remove-btn" onclick="removeImg()" title="Elimină imaginea">✕</button>
               <div class="img-name" id="imgName"></div>
+            </div>
+          </div>
+        </div>
+        <div class="full" id="docAttachField" style="display:none;">
+          <label>Document atașat (opțional)</label>
+          <div class="img-capture-wrap">
+            <button type="button" class="img-capture-btn" onclick="triggerDocumentPicker()">
+              <span class="cam-icon">📎</span>
+              <span id="docBtnTxt">Alege document PDF, Word sau Excel</span>
+            </button>
+            <input type="file" id="docInput"
+                   accept=".pdf,.doc,.docx,.xls,.xlsx,.odt,.ods,.txt"
+                   style="display:none" onchange="handleDocument(this)">
+            <div class="doc-selected" id="docSelected">
+              <div class="doc-title" id="docName"></div>
+              <div class="doc-meta" id="docMeta"></div>
+              <button type="button" class="img-remove-btn" onclick="removeDocument()" title="Elimină documentul">✕</button>
             </div>
           </div>
         </div>
@@ -1427,6 +1453,69 @@ function resetF() {
 // ╚══════════════════════════════════════════╝
 // ── imagine ──
 let capturedImgDataUrl = null;
+let attachedDocument = null;
+const REQUEST_DOCUMENT_CATEGORIES = new Set([
+  'Proces Verbal Scule',
+  'Proces Verbal Echipament',
+  'Proces Verbal PPE',
+  'Proces Verbal Auto',
+  'Proces Verbal Scule Masina'
+]);
+
+function updateReqDocumentVisibility() {
+  const subject = document.getElementById('rqSubj')?.value || '';
+  const field = document.getElementById('docAttachField');
+  const show = REQUEST_DOCUMENT_CATEGORIES.has(subject);
+  if (field) field.style.display = show ? 'block' : 'none';
+  if (!show) removeDocument();
+}
+
+function triggerDocumentPicker() {
+  document.getElementById('docInput')?.click();
+}
+
+function handleDocument(input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  const allowed = ['pdf','doc','docx','xls','xlsx','odt','ods','txt'];
+  const maxBytes = 8 * 1024 * 1024;
+  if (!allowed.includes(ext)) {
+    toast('Tip de document neacceptat. Folosește PDF, Word, Excel, ODT, ODS sau TXT.', true);
+    input.value = '';
+    return;
+  }
+  if (file.size > maxBytes) {
+    toast('Documentul este prea mare. Dimensiunea maximă este 8 MB.', true);
+    input.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    attachedDocument = {
+      data: e.target.result,
+      name: file.name,
+      mime: file.type || 'application/octet-stream',
+      size: file.size
+    };
+    document.getElementById('docName').textContent = '📄 ' + file.name;
+    document.getElementById('docMeta').textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+    document.getElementById('docSelected').style.display = 'block';
+    document.getElementById('docBtnTxt').textContent = 'Schimbă documentul';
+  };
+  reader.onerror = () => toast('Documentul nu a putut fi citit.', true);
+  reader.readAsDataURL(file);
+}
+
+function removeDocument() {
+  attachedDocument = null;
+  const input = document.getElementById('docInput');
+  const selected = document.getElementById('docSelected');
+  const btnTxt = document.getElementById('docBtnTxt');
+  if (input) input.value = '';
+  if (selected) selected.style.display = 'none';
+  if (btnTxt) btnTxt.textContent = 'Alege document PDF, Word sau Excel';
+}
 
 function triggerCamera() {
   document.getElementById('imgInput').click();
@@ -1538,6 +1627,7 @@ async function dispatchEmail() {
   const areSig = sigCanvas && sigHasMark;
   const sigDataUrl = areSig ? sigCanvas.toDataURL('image/png') : null;
   const areImg = !!capturedImgDataUrl;
+  const areDoc = !!attachedDocument;
 
   loader(true, 'Se trimite solicitarea...');
 
@@ -1554,6 +1644,10 @@ async function dispatchEmail() {
       areImg:   areImg,
       imgData:  areImg ? capturedImgDataUrl : '',
       noteImg:  areImg ? '[Imagine atașată de tehnician]' : '',
+      areDoc:   areDoc,
+      docData:  areDoc ? attachedDocument.data : '',
+      docName:  areDoc ? attachedDocument.name : '',
+      docMime:  areDoc ? attachedDocument.mime : '',
     };
 
     const res = await apiCall('POST', payload);
@@ -1592,6 +1686,8 @@ function resetReqForm() {
   if (d) d.value = new Date().toLocaleDateString('ro-RO',
     {weekday:'long', day:'numeric', month:'long', year:'numeric'});
   removeImg();
+  removeDocument();
+  updateReqDocumentVisibility();
 }
 
 // ╔══════════════════════════════════════════╗
